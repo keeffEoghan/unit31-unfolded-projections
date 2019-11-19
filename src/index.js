@@ -8,7 +8,6 @@ import { range, map, each } from './array';
 import { rootPath } from './utils';
 
 import screenVert from './screen/index.vert.glsl';
-// import screenFrag from './screen/index.frag.glsl';
 import drawFrag from './draw.frag.glsl';
 
 const regl = self.regl = getRegl({
