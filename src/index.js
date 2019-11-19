@@ -20,7 +20,12 @@ const state = State({
         numImages: State.Slider(16,
             { min: 1, max: regl.limits.maxTextureUnits, step: 1 }),
         numCells: State.Slider(30, { min: 0, max: 100, step: 1 }),
-        speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 })
+        speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
+        smoothing: {
+            amount: State.Slider(2**7, { min: 0, max: 2**7, step: 1 }),
+            limit: State.Slider(0.3, { min: 0, max: 2, step: 0.01 }),
+            style: State.Select('none', { options: ['power', 'exponent', 'none'] }),
+        }
     },
     presets: State.Section({
             simple() {
@@ -84,6 +89,7 @@ if(module.hot) {
 const updateFrag = () =>
     `#define numImages ${state.draw.numImages}\n`+
     `#define numCells ${state.draw.numCells}\n`+
+    `#define smoothing_${state.draw.smoothing.style}\n`+
     '\n'+
     drawFrag;
 
@@ -103,7 +109,9 @@ const uniforms = {
 
         return viewShape;
     },
-    speed: regl.prop('state.draw.speed')
+    speed: regl.prop('state.draw.speed'),
+    smoothing: regl.prop('state.draw.smoothing.amount'),
+    smoothLimit: regl.prop('state.draw.smoothing.limit')
 };
 
 each((v, i) => {
@@ -147,7 +155,8 @@ function updateImages() {
 updateImages();
 
 state.$onChanges((changes) => {
-    if(('draw.numImages' in changes) || ('draw.numCells' in changes)) {
+    if(('draw.numImages' in changes) || ('draw.numCells' in changes) ||
+        ('draw.smoothing.style' in changes)) {
         frag = updateFrag();
     }
 
