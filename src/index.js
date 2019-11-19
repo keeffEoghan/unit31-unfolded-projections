@@ -19,8 +19,8 @@ const state = State({
     draw: {
         numImages: State.Slider(16,
             { min: 1, max: regl.limits.maxTextureUnits, step: 1 }),
-        numCells: State.Slider(30, { min: 0, max: 200, step: 1 }),
-        speed: State.Slider(0.1/60, { min: -10/60, max: 10/60, step: 0.01/60 })
+        numCells: State.Slider(30, { min: 0, max: 100, step: 1 }),
+        speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 })
     },
     presets: State.Section({
             simple() {
