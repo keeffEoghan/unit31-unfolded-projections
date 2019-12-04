@@ -35,9 +35,10 @@ precision highp float;
 uniform sampler2D images[imageCount];
 uniform vec3 shapes[imageCount];
 uniform vec2 viewShape;
-uniform float tick;
+uniform float time;
 uniform float speed;
 uniform float distLimit;
+uniform vec4 mask;
 
 #if distStyle != distStyle_min
     uniform float distSmooth;
@@ -58,6 +59,7 @@ uniform float distLimit;
 
 #if edgeStyle != edgeStyle_none
     uniform float edgeSize;
+    uniform vec2 edgeFade;
 
     #if edgeStyle != edgeStyle_min
         uniform float edgeSmooth;
@@ -106,8 +108,15 @@ const vec4 stRange = vec4(0, 0, 1, 1);
 #pragma glslify: aspectContain = require('glsl-aspect/contain');
 #pragma glslify: bezier = require('bezier-gen/1d');
 
-#pragma glslify: rgbToHSL = require('../glsl-hsl-rgb/rgb-to-hsl');
-#pragma glslify: hslToRGB = require('../glsl-hsl-rgb/hsl-to-rgb');
+// #pragma glslify: rgb_to_hsl = require('glsl-color-spaces');
+// #pragma glslify: hsl_to_rgb = require('glsl-color-spaces');
+
+// #pragma glslify: rgb_to_hsv = require('glsl-color-spaces');
+// #pragma glslify: hsv_to_rgb = require('glsl-color-spaces');
+
+// #pragma glslify: rgbToHSL = require('../glsl-hsl-rgb/rgb-to-hsl');
+// #pragma glslify: hslToRGB = require('../glsl-hsl-rgb/hsl-to-rgb');
+
 #pragma glslify: smin = require('../smooth-min.glsl');
 
 const float epsilon = 0.0000001;
@@ -130,7 +139,7 @@ struct Voronoi {
 // @todo Replace this with a more interesting movement.
 // @todo Replace this with lookup into points buffer.
 vec2 getCell(in float index) {
-    float t = tick*speed;
+    float t = time*speed;
 
     return vec2(noise(vec2(t, index*1234.5678)), noise(vec2(t, index*5678.1234)));
 }
@@ -227,7 +236,7 @@ Voronoi getVoronoi(in vec2 pos) {
             #if edgeStyle == edgeStyle_min
                 edge = min(edge, edgeI);
             #else
-                edge = smoothEdgeSum(edge, edgeI, edgeSmooth);
+                edge = smoothEdgeSum(edge, abs(edgeI), edgeSmooth);
             #endif
 
             #if spaceStyle == spaceStyle_near
@@ -262,6 +271,8 @@ Voronoi getVoronoi(in vec2 pos) {
             space/float(cellCount),
         #elif spaceStyle == spaceStyle_smin
             space,
+        #elif spaceStyle == spaceStyle_exp
+            1.0/space,
         #elif spaceStyle != spaceStyle_none
             smoothSpaceOut(space, spaceBias),
         #endif
@@ -337,32 +348,27 @@ float spaceToLOD(in float space) {
 }
 
 float spaceToColor(in float space) {
-    float k0 = 0.0;
-    float k1 = 0.5;
-    float k2 = 1.0;
-
-    float k0k1 = k1-k0;
-    float k1k2 = k2-k1;
-
-    return (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, k0, k1))*k0k1)+
-        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, k1, k2))*k1k2);
+    return bezier(10.0, 0.2, 0.0, 0.0, space);
 }
 
 float spaceToFill(in float space) {
-    float k0 = 0.0;
-    float k1 = 0.5;
-    float k2 = 1.0;
+    float i0 = 0.0;
+    float i1 = 0.333;
+    float i2 = 0.666;
+    float i3 = 1.0;
 
-    float k0k1 = k1-k0;
-    float k1k2 = k2-k1;
+    float i0i1 = i1-i0;
+    float i1i2 = i2-i1;
+    float i2i3 = i3-i2;
 
-    return (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, k0, k1))*k0k1)+
-        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, k1, k2))*k1k2);
+    return (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, i0, i1))*i0i1)+
+        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, i1, i2))*i1i2)+
+        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, i2, i3))*i2i3);
 }
 
 void main() {
     vec2 st = map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
-    vec2 xy = uv*aspectCover(1.0/viewShape);
+    vec2 xy = uv*aspectContain(1.0/viewShape);
 
     Voronoi voronoi = getVoronoi(xy);
 
@@ -370,26 +376,53 @@ void main() {
     int imageIndex = int(mod(voronoi.index, float(imageCount)));
 
     #if edgeStyle != edgeStyle_none
-        float edge = step(0.0, voronoi.edge-edgeSize);
+        float edge = (voronoi.edge-edgeSize)/edgeFade.r*
+            (1.0-pow(dot(xy, xy), edgeFade.g));
     #else
         float edge = 1.0;
     #endif
 
     #if spaceStyle != spaceStyle_none
-        vec4 image = getImage(imageIndex, st, spaceToLOD(voronoi.space));
-        float colorBump = spaceToColor(voronoi.space);
-        vec3 hsl = rgbToHSL(image.rgb);
-        vec4 rgba = vec4(hslToRGB(hsl.x, min(hsl.y+colorBump, 0.0), hsl.z), image.a);
-
+        float colorMix = spaceToColor(clamp(voronoi.space, 0.0, 1.0));
         float fill = spaceToFill(voronoi.space);
 
-        // gl_FragColor = mix(vec4(0), rgba,
-        //     clamp(mix((1.0-dist)+fill, edge, fill), 0.0, 1.0));
-        // gl_FragColor = vec4(fill, 1.0-dist, edge, 1.0);
-        gl_FragColor = vec4(voronoi.space, 0.0, edge, 1.0);
+        #ifdef drawTest
+            vec4 color = vec4(fill, colorMix, 1.0-dist, clamp(edge, 0.0, 1.0));
+        #else
+            vec4 image = getImage(imageIndex, st, spaceToLOD(voronoi.space));
+            vec4 mixed = clamp(vec4(image.rgb+colorMix, image.a), 0.0, 1.0);
+
+            vec4 color = mix(vec4(0), mixed,
+                clamp(mix(1.0-dist, edge, fill), 0.0, 1.0));
+
+            // vec3 hsl = rgbToHSL(image.rgb);
+            // vec3 hsl = rgb_to_hsl(image.rgb);
+            // vec4 rgba = vec4(hsl_to_rgb(hsl.x, min(hsl.y+colorMix, 0.0), hsl.z), image.a);
+            // vec4 rgba = vec4(hsl_to_rgb(hsl), image.a);
+            // vec4 rgba = vec4(hslToRGB(hsl.x, min(hsl.y+colorMix, 0.0), hsl.z), image.a);
+            // vec4 rgba = vec4(hslToRGB(hsl), image.a);
+            // vec4 rgba = image;
+
+            // vec4 color = mix(vec4(0), rgba,
+            //     clamp(mix((1.0-dist)+fill, edge, fill), 0.0, 1.0));
+
+            // vec4 color = vec4(hsl_to_rgb(rgb_to_hsl(image.rgb)), 1.0);
+            // vec4 color = vec4(vec3(distance(image.rgb, hsl_to_rgb(rgb_to_hsl(image.rgb)))),
+            //     1.0);
+            // vec4 color = vec4(hsv_to_rgb(rgb_to_hsv(image.rgb)), 1.0);
+            // vec4 color = vec4(vec3(distance(image.rgb, hsv_to_rgb(rgb_to_hsv(image.rgb)))),
+            //     1.0);
+            // vec4 color = vec4(hslToRGB(rgbToHSL(image.rgb)), 1.0);
+            // vec4 color = vec4(vec3(distance(image.rgb, hslToRGB(rgbToHSL(image.rgb)))),
+            //     1.0);
+        #endif
     #else
         vec4 image = getImage(imageIndex, st);
-
-        gl_FragColor = mix(vec4(0), image, (1.0-dist)*edge);
+        vec4 color = mix(vec4(0), image, (1.0-dist)*edge);
     #endif
+
+    color = clamp(color*mask, 0.0, 1.0);
+
+    gl_FragColor = vec4(color.rgb*color.a, color.a);
+    // gl_FragColor = color;
 }

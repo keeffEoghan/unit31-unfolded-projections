@@ -70,7 +70,7 @@ function updateImages() {
 
             const image = assets.images[i] = new Image();
             const texture = assets.textures[i] = regl.texture();
-            const shape = assets.shapes[i] = Array(3).fill(1);
+            const shape = assets.shapes[i] = [1, 1, 1];
 
             image.addEventListener('load', () => {
                 // texture({ data: image, min: 'mipmap', mipmap: 'nice' });

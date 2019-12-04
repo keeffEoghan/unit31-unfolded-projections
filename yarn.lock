@@ -2455,6 +2455,10 @@ globals@^11.1.0:
   version "1.0.0"
   resolved "https://github.com/keeffEoghan/glsl-aspect/#d87330b0114dd222c1149859d1583fa540575ae1"
 
+"glsl-color-spaces@https://github.com/keeffEoghan/glsl-color-spaces":
+  version "1.0.0"
+  resolved "https://github.com/keeffEoghan/glsl-color-spaces#2402fd90c60ce1e9731e5eec3232d607456ba0e1"
+
 glsl-inject-defines@^1.0.1:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/glsl-inject-defines/-/glsl-inject-defines-1.0.3.tgz#dd1aacc2c17fcb2bd3fc32411c6633d0d7b60fd4"

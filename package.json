@@ -23,6 +23,7 @@
     "controls-state": "^1.1.1",
     "get-base-path": "https://github.com/keeffEoghan/get-base-path",
     "glsl-aspect": "https://github.com/keeffEoghan/glsl-aspect/",
+    "glsl-color-spaces": "https://github.com/keeffEoghan/glsl-color-spaces",
     "glsl-map": "^1.0.1",
     "glsl-noise": "^0.0.0",
     "glsl-random": "^0.0.5",
