@@ -2,37 +2,49 @@ import getRegl from 'regl';
 import State from 'controls-state';
 import GUI from 'controls-gui';
 import merge from 'lodash-es/merge';
+import { range, map, each } from 'array-utils';
+import { getBasePath } from 'get-base-path';
 
-import { positions as screenPositions } from './screen';
-import { range, map, each } from './array';
-import { rootPath } from './utils';
+import { countImageLODs } from './utils';
 
-import screenVert from './screen/index.vert.glsl';
-import drawFrag from './draw.frag.glsl';
+import {
+        getVoronoi, optionalExtensions as voronoiOptionalExtensions
+    } from './voronoi';
+
+const basePath = getBasePath();
+
+const extensions = ['OES_texture_float'];
+const optionalExtensions = [...voronoiOptionalExtensions];
 
 const regl = self.regl = getRegl({
     attributes: { antialias: false, depth: false },
-    pixelRatio: Math.max(+devicePixelRatio, 1.5)
+    pixelRatio: Math.max((devicePixelRatio | 0), 1.5),
+    extensions,
+    optionalExtensions
+});
+
+const assets = {
+    sources: [],
+    images: [],
+    textures: [],
+    shapes: []
+};
+
+const voronoi = getVoronoi(regl, {
+    images: assets.textures,
+    shapes: assets.shapes,
+    maxImages: regl.limits.maxTextureUnits
 });
 
 const state = State({
-    draw: {
-        numImages: State.Slider(16,
-            { min: 1, max: regl.limits.maxTextureUnits, step: 1 }),
-        numCells: State.Slider(30, { min: 0, max: 100, step: 1 }),
-        speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
-        smoothing: {
-            amount: State.Slider(2**7, { min: 0, max: 2**7, step: 1 }),
-            limit: State.Slider(0.3, { min: 0, max: 2, step: 0.01 }),
-            style: State.Select('none', { options: ['power', 'exponent', 'none'] }),
-        }
-    },
+    voronoi: voronoi.state,
     presets: State.Section({
             simple() {
                 merge(state, {});
             }
         },
         { enumerable: false, label: 'State Output' }),
+
     stateOutput: State.Section({
             output: State.Raw((h, { state }) =>
                 h('pre', { style: 'max-width: 260px; overflow: auto;' },
@@ -41,7 +53,7 @@ const state = State({
         { enumerable: false, label: 'State Output' })
 });
 
-const controls = GUI(state, {
+GUI(state, {
     className: 'controls',
     containerCSS: `
         position: fixed;
@@ -53,127 +65,57 @@ const controls = GUI(state, {
     `
 });
 
-const listeners = {
-    active: [],
-    add(el, type, f) {
-        const binding = [el, type, f];
-
-        this.active.push(binding);
-        el.addEventListener(type, f);
-
-        return binding;
-    },
-    remove(binding) {
-        const [el, type, f] = binding;
-
-        el.removeEventListener(type, f);
-        this.active.splice(this.active.indexOf(binding), 1);
-    },
-    removeAll() {
-        this.active.forEach(([el, type, f]) => el.removeEventListener(type, f));
-        this.active.length = 0;
-    }
-};
-
-if(module.hot) {
-    module.hot.dispose(() => {
-        console.log('hot reload - dispose');
-        listeners.removeAll();
-        (regl && regl.destroy());
-        (controls && document.querySelector('.controls').remove());
-    });
-
-    module.hot.accept(() => console.log('hot reload - accept'));
-}
-
-const updateFrag = () =>
-    `#define numImages ${state.draw.numImages}\n`+
-    `#define numCells ${state.draw.numCells}\n`+
-    `#define smoothing_${state.draw.smoothing.style}\n`+
-    '\n'+
-    drawFrag;
-
-let frag = updateFrag();
-
-const cache = {
-    viewShape: [0, 0]
-};
-
-const uniforms = {
-    tick: regl.context('tick'),
-    viewShape: ({ viewportWidth: w, viewportHeight: h }) => {
-        const { viewShape } = cache;
-
-        viewShape[0] = w;
-        viewShape[1] = h;
-
-        return viewShape;
-    },
-    speed: regl.prop('state.draw.speed'),
-    smoothing: regl.prop('state.draw.smoothing.amount'),
-    smoothLimit: regl.prop('state.draw.smoothing.limit')
-};
-
-each((v, i) => {
-        uniforms[`images[${i}]`] = regl.prop(`textures[${i}]`);
-        uniforms[`shapes[${i}]`] = regl.prop(`shapes[${i}]`);
-    },
-    range(regl.limits.maxTextureUnits));
-
-const drawState = {
-    state,
-    sources: [],
-    images: [],
-    textures: [],
-    shapes: []
-};
-
+// @todo Switch images when active cells leave viewport, or simply fade between.
 function updateImages() {
-    each((t, i) => t.destroy(), drawState.textures);
+    each((t, i) => t.destroy(), assets.textures);
 
-    drawState.sources.length = drawState.images.length = drawState.textures.length =
-        drawState.shapes.length = 0;
+    assets.sources.length = assets.images.length = assets.textures.length =
+        assets.shapes.length = 0;
 
-    drawState.sources = map((v, i) => {
-            const source = `${rootPath}assets/${i}.jpg`;
+    map((v, i) => {
+            const source = `${basePath}assets/${i}.jpg`;
 
-            const image = drawState.images[i] = new Image();
-            const texture = drawState.textures[i] = regl.texture();
-            const shape = drawState.shapes[i] = [texture.width, texture.height];
+            const image = assets.images[i] = new Image();
+            const texture = assets.textures[i] = regl.texture();
+            const shape = assets.shapes[i] = Array(3).fill(1);
 
             image.addEventListener('load', () => {
+                // texture({ data: image, min: 'mipmap', mipmap: 'nice' });
                 texture(image);
-                shape[0] = texture.width;
-                shape[1] = texture.height;
+
+                shape[2] = countImageLODs((shape[0] = texture.width),
+                    (shape[1] = texture.height));
             });
 
             return image.src = source;
         },
-        range(state.draw.numImages), 0);
+        range(state.voronoi.imageCount),
+        assets.sources);
 }
 
 updateImages();
 
-state.$onChanges((changes) => {
-    if(('draw.numImages' in changes) || ('draw.numCells' in changes) ||
-        ('draw.smoothing.style' in changes)) {
-        frag = updateFrag();
-    }
+voronoi.framebuffer = regl.framebuffer({ colorType: 'float' });
 
-    if(('draw.numImages' in changes)) {
-        updateImages();
-    }
-});
+const cache = {
+    voronoi: { state: null }
+};
 
-const draw = regl({
-    vert: screenVert,
-    frag: () => frag,
-    attributes: { position: screenPositions },
-    uniforms,
-    count: screenPositions.length/2
-});
+function drawVoronoi() {
+    cache.voronoi.state = state.voronoi;
+    voronoi.draw(cache.voronoi);
+}
 
-regl.frame(() => {
-    regl.clear({ color: [0, 0, 0, 255], depth: 1 });
-    draw(drawState);
+const clear = {
+    view: { color: [0, 0, 0, 1], depth: 1 },
+    voronoi: { color: [0, 0, 0, 1], depth: 1, framebuffer: voronoi.framebuffer }
+};
+
+regl.frame(({ drawingBufferWidth: w, drawingBufferHeight: h }) => {
+    regl.clear(clear.view);
+    // regl.clear(clear.voronoi);
+
+    // voronoi.framebuffer.resize(w, h);
+    // voronoi.framebuffer.use(drawVoronoi);
+    drawVoronoi();
 });
