@@ -4,24 +4,30 @@
     #extension GL_EXT_shader_texture_lod : enable
 #endif
 
-#define smoothingStyle_none 0
-#define smoothingStyle_power 1
-#define smoothingStyle_exponent 2
-#ifndef smoothingStyle
-    #define smoothingStyle smoothingStyle_exponent
+#define distStyle_min 0
+#define distStyle_pow 1
+#define distStyle_exp 2
+#define distStyle_smin 3
+#ifndef distStyle
+    #define distStyle distStyle_smin
 #endif
 
-#define borderStyle_none 0
-#define borderStyle_pass2Skip 1
-#define borderStyle_pass2 2
-#ifndef borderStyle
-    #define borderStyle borderStyle_pass2Skip
+#define edgeStyle_min 0
+#define edgeStyle_pow 1
+#define edgeStyle_exp 2
+#define edgeStyle_smin 3
+#define edgeStyle_none 4
+#ifndef edgeStyle
+    #define edgeStyle edgeStyle_smin
 #endif
 
-#define spaceStyle_none 0
-#define spaceStyle_nearby 1
+#define spaceStyle_near 0
+#define spaceStyle_pow 1
+#define spaceStyle_exp 2
+#define spaceStyle_smin 3
+#define spaceStyle_none 4
 #ifndef spaceStyle
-    #define spaceStyle spaceStyle_nearby
+    #define spaceStyle spaceStyle_near
 #endif
 
 precision highp float;
@@ -33,14 +39,60 @@ uniform float tick;
 uniform float speed;
 uniform float distLimit;
 
-#if smoothingStyle != smoothingStyle_none
-    uniform float smoothing;
+#if distStyle != distStyle_min
+    uniform float distSmooth;
+
+    #if distStyle == distStyle_pow
+        #define smoothDistSumSq smoothPowSumSq
+        #define smoothDistSum smoothPowSum
+        #define smoothDistOut smoothPowOut
+    #elif distStyle == distStyle_exp
+        #define smoothDistSumSq smoothExpSumSq
+        #define smoothDistSum smoothExpSum
+        #define smoothDistOut smoothExpOut
+    #elif distStyle == distStyle_smin
+        #define smoothDistSumSq smoothMinSumSq
+        #define smoothDistSum smoothMinSum
+    #endif
 #endif
-#if borderStyle != borderStyle_none
-    uniform float borderSize;
+
+#if edgeStyle != edgeStyle_none
+    uniform float edgeSize;
+
+    #if edgeStyle != edgeStyle_min
+        uniform float edgeSmooth;
+
+        #if edgeStyle == edgeStyle_pow
+            #define smoothEdgeSumSq smoothPowSumSq
+            #define smoothEdgeSum smoothPowSum
+            #define smoothEdgeOut smoothPowOut
+        #elif edgeStyle == edgeStyle_exp
+            #define smoothEdgeSumSq smoothExpSumSq
+            #define smoothEdgeSum smoothExpSum
+            #define smoothEdgeOut smoothExpOut
+        #elif edgeStyle == edgeStyle_smin
+            // [See this `round voronoi` Shadertoy](https://www.shadertoy.com/view/ldXBDs)
+            #define smoothEdgeSumSq smoothMinSumSq
+            #define smoothEdgeSum smoothMinSum
+        #endif
+    #endif
 #endif
+
 #if spaceStyle != spaceStyle_none
-    uniform float nearBias;
+    uniform float spaceBias;
+
+    #if spaceStyle == spaceStyle_pow
+        #define smoothSpaceSumSq smoothPowSumSq
+        #define smoothSpaceSum smoothPowSum
+        #define smoothSpaceOut smoothPowOut
+    #elif spaceStyle == spaceStyle_exp
+        #define smoothSpaceSumSq smoothExpSumSq
+        #define smoothSpaceSum smoothExpSum
+        #define smoothSpaceOut smoothExpOut
+    #elif spaceStyle == spaceStyle_smin
+        #define smoothSpaceSumSq smoothMinSumSq
+        #define smoothSpaceSum smoothMinSum
+    #endif
 #endif
 
 varying vec2 uv;
@@ -56,13 +108,14 @@ const vec4 stRange = vec4(0, 0, 1, 1);
 
 #pragma glslify: rgbToHSL = require('../glsl-hsl-rgb/rgb-to-hsl');
 #pragma glslify: hslToRGB = require('../glsl-hsl-rgb/hsl-to-rgb');
+#pragma glslify: smin = require('../smooth-min.glsl');
 
 const float epsilon = 0.0000001;
 const float infinity = 100000000.0;
 
 struct Voronoi {
-    #if borderStyle != borderStyle_none
-        float border;
+    #if edgeStyle != edgeStyle_none
+        float edge;
     #endif
 
     #if spaceStyle != spaceStyle_none
@@ -86,22 +139,60 @@ vec2 getCell(in int index) {
     return getCell(float(index));
 }
 
-float getBorder(in vec2 pos, in vec2 cell0, in vec2 cell1, in vec2 nCell1ToCell0) {
+float getEdge(in vec2 pos, in vec2 cell0, in vec2 cell1, in vec2 nCell1ToCell0) {
     return dot(pos-(0.5*(cell0+cell1)), nCell1ToCell0);
 }
 
-float getBorder(in vec2 pos, in vec2 cell0, in vec2 cell1) {
-    return getBorder(pos, cell0, cell1, normalize(cell0-cell1));
+float getEdge(in vec2 pos, in vec2 cell0, in vec2 cell1) {
+    return getEdge(pos, cell0, cell1, normalize(cell0-cell1));
+}
+
+
+// [Smoothed voronoi as per IQ](https://www.iquilezles.org/www/articles/smoothvoronoi/smoothvoronoi.htm)
+
+float smoothPowSumSq(in float sum, in float distSq, in float smoothing) {
+    return sum+(1.0/pow(distSq, smoothing));
+}
+
+float smoothPowSum(in float sum, in float dist, in float smoothing) {
+    return smoothPowSumSq(sum, dist*dist, smoothing);
+}
+
+float smoothPowOut(in float sum, in float smoothing) {
+    return pow(1.0/sum, 1.0/(smoothing*2.0));
+}
+
+float smoothExpSum(in float sum, in float dist, in float smoothing) {
+    return sum+exp(-smoothing*dist);
+}
+
+float smoothExpSumSq(in float sum, in float distSq, in float smoothing) {
+    return smoothExpSum(sum, sqrt(distSq), smoothing);
+}
+
+float smoothExpOut(in float sum, in float smoothing) {
+    return (-1.0/smoothing)*log(sum);
+}
+
+float smoothMinSum(in float sum, in float dist, in float smoothing) {
+    return smin(sum, dist, smoothing);
+}
+
+float smoothMinSumSq(in float sum, in float distSq, in float smoothing) {
+    return smin(sum, distSq, smoothing);
 }
 
 Voronoi getVoronoi(in vec2 pos) {
     float distSq0 = infinity;
-    float dist;
     float index0;
     vec2 cell0;
 
-    #if borderStyle != borderStyle_none
-        float border = infinity;
+    #if distStyle != distStyle_min
+        float distSum;
+    #endif
+
+    #if edgeStyle != edgeStyle_none
+        float edge = infinity;
     #endif
 
     #if spaceStyle != spaceStyle_none
@@ -120,69 +211,67 @@ Voronoi getVoronoi(in vec2 pos) {
             distSq0 = distSqI;
         }
 
-        // [Smoothed voronoi as per IQ](https://www.iquilezles.org/www/articles/smoothvoronoi/smoothvoronoi.htm)
-        #if smoothingStyle == smoothingStyle_power
-            dist += 1.0/pow(distSqI, smoothing);
-        #elif smoothingStyle == smoothingStyle_exponent
-            dist += exp(-smoothing*sqrt(distSqI));
+        #if distStyle != distStyle_min
+            distSum = smoothDistSumSq(distSum, distSqI, distSmooth);
         #endif
     }
 
-    #if borderStyle == borderStyle_pass2
-        // [Borders as per IQ's 2-pass voronoi](https://www.iquilezles.org/www/articles/voronoilines/voronoilines.htm)
-        for(int i = 0; i < cellCount; ++i) {
-            vec2 cellI = getCell(i);
-            vec2 cellIToCell0 = cell0-cellI;
-            float lSq = dot(cellIToCell0, cellIToCell0);
-
-            if(lSq > epsilon) {
-                float l = sqrt(lSq);
-
-                border = min(border,
-                    getBorder(pos, cell0, cellI, cellIToCell0/l));
-
-                #if spaceStyle == spaceStyle_nearby
-                    space += pow(l, nearBias);
-                #endif
-            }
-        }
-    #elif borderStyle == borderStyle_pass2Skip
-        // [Borders as per IQ's 2-pass voronoi, skipping current cell](https://www.iquilezles.org/www/articles/voronoilines/voronoilines.htm)
+    #if edgeStyle != edgeStyle_none
+        // [Edges as per IQ's 2-pass voronoi, skipping current cell](https://www.iquilezles.org/www/articles/voronoilines/voronoilines.htm)
         for(int i = 1; i < cellCount; ++i) {
             vec2 cellI = getCell(mod(index0+float(i), float(cellCount)));
             vec2 cellIToCell0 = cell0-cellI;
             float l = length(cellIToCell0);
+            float edgeI = getEdge(pos, cell0, cellI, cellIToCell0/l);
 
-            border = min(border,
-                getBorder(pos, cell0, cellI, cellIToCell0/l));
+            #if edgeStyle == edgeStyle_min
+                edge = min(edge, edgeI);
+            #else
+                edge = smoothEdgeSum(edge, edgeI, edgeSmooth);
+            #endif
 
-            #if spaceStyle == spaceStyle_nearby
-                space += pow(l, nearBias);
+            #if spaceStyle == spaceStyle_near
+                space += pow(l, spaceBias);
+            #elif spaceStyle != spaceStyle_none
+                space = smoothSpaceSum(space, l, spaceBias);
             #endif
         }
-    #elif spaceStyle == spaceStyle_nearby
+    #elif spaceStyle != spaceStyle_none
         for(int i = 1; i < cellCount; ++i) {
             vec2 cellI = getCell(mod(index0+float(i), float(cellCount)));
+            float l = distance(cell0, cellI);
 
-            space += pow(distance(cell0, cellI), nearBias);
+            #if spaceStyle == spaceStyle_near
+                space += pow(l, spaceBias);
+            #else
+                space = smoothSpaceSum(space, l, spaceBias);
+            #endif
         }
     #endif
 
     return Voronoi(
-        #if borderStyle != borderStyle_none
-            border,
+        #if edgeStyle != edgeStyle_none
+            #if edgeStyle == edgeStyle_min || edgeStyle == edgeStyle_smin
+                edge,
+            #else
+                smoothEdgeOut(edge, edgeSmooth),
+            #endif
         #endif
 
-        #if spaceStyle != spaceStyle_none
+        #if spaceStyle == spaceStyle_near
             space/float(cellCount),
+        #elif spaceStyle == spaceStyle_smin
+            space,
+        #elif spaceStyle != spaceStyle_none
+            smoothSpaceOut(space, spaceBias),
         #endif
 
-        #if smoothingStyle == smoothingStyle_power
-            pow(1.0/dist, 1.0/(smoothing*2.0)),
-        #elif smoothingStyle == smoothingStyle_exponent
-            -log(dist)/smoothing,
-        #else
+        #if distStyle == distStyle_min
             sqrt(distSq0),
+        #elif distStyle == distStyle_smin
+            sqrt(distSum),
+        #else
+            smoothDistOut(distSum, distSmooth),
         #endif
 
         cell0,
@@ -217,7 +306,7 @@ vec4 getImage(in int index, in vec2 st, in float lod) {
             float nLOD = shape.z;
 
             #ifdef GL_EXT_shader_texture_lod
-                image = texture2DLodEXT(images[i], uv, lod*nLOD);
+                image = texture2DLodEXT(images[i], uv, clamp(lod, 0.0, 1.0)*nLOD);
             #else
                 // The `bias` argument is in the range [-1, 1] and influences the `mix`
                 // between 2 already-defined levels-of-detail.
@@ -244,7 +333,7 @@ vec4 getImage(in float index, in vec2 st) {
 }
 
 float spaceToLOD(in float space) {
-    return bezier(1.0, 0.0, 1.0, 0.0, clamp(space, 0.0, 1.0));
+    return bezier(1.0, 0.0, 1.0, 0.0, space);
 }
 
 float spaceToColor(in float space) {
@@ -280,10 +369,10 @@ void main() {
     float dist = clamp(voronoi.dist/distLimit, 0.0, 1.0);
     int imageIndex = int(mod(voronoi.index, float(imageCount)));
 
-    #if borderStyle != borderStyle_none
-        float border = step(0.0, voronoi.border-borderSize);
+    #if edgeStyle != edgeStyle_none
+        float edge = step(0.0, voronoi.edge-edgeSize);
     #else
-        float border = 1.0;
+        float edge = 1.0;
     #endif
 
     #if spaceStyle != spaceStyle_none
@@ -294,11 +383,13 @@ void main() {
 
         float fill = spaceToFill(voronoi.space);
 
-        gl_FragColor = mix(vec4(0), rgba,
-            clamp(mix((1.0-dist)+fill, border, fill), 0.0, 1.0));
+        // gl_FragColor = mix(vec4(0), rgba,
+        //     clamp(mix((1.0-dist)+fill, edge, fill), 0.0, 1.0));
+        // gl_FragColor = vec4(fill, 1.0-dist, edge, 1.0);
+        gl_FragColor = vec4(voronoi.space, 0.0, edge, 1.0);
     #else
         vec4 image = getImage(imageIndex, st);
 
-        gl_FragColor = mix(vec4(0), image, (1.0-dist)*border);
+        gl_FragColor = mix(vec4(0), image, (1.0-dist)*edge);
     #endif
 }

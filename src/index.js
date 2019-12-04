@@ -23,12 +23,7 @@ const regl = self.regl = getRegl({
     optionalExtensions
 });
 
-const assets = {
-    sources: [],
-    images: [],
-    textures: [],
-    shapes: []
-};
+const assets = { sources: [], images: [], textures: [], shapes: [] };
 
 const voronoi = getVoronoi(regl, {
     images: assets.textures,
@@ -39,11 +34,9 @@ const voronoi = getVoronoi(regl, {
 const state = State({
     voronoi: voronoi.state,
     presets: State.Section({
-            simple() {
-                merge(state, {});
-            }
+            simple: () => merge(state, {})
         },
-        { enumerable: false, label: 'State Output' }),
+        { enumerable: false, label: 'Presets' }),
 
     stateOutput: State.Section({
             output: State.Raw((h, { state }) =>

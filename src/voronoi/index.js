@@ -1,4 +1,5 @@
 import State from 'controls-state';
+import merge from 'lodash-es/merge';
 import { range, each } from 'array-utils';
 import { positions as screenPositions, count } from '@epok.tech/gl-screen-triangle';
 
@@ -24,21 +25,64 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         cellCount: State.Slider(30, { min: 0, max: 100, step: 1 }),
         speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
         distance: {
-            limit: State.Slider(0.2, { min: 0, max: 2, step: 0.01 }),
-            smoothing: {
-                amount: State.Slider(7, { min: 0, max: 2**7, step: 1 }),
-                style: State.Select('exponent',
-                    { options: ['none', 'power', 'exponent'] })
-            },
-            border: {
-                size: State.Slider(0.01, { min: 0, max: 1, step: 0.0001 }),
-                style: State.Select('pass2Skip',
-                    { options: ['none', 'pass2Skip', 'pass2'] })
-            },
-            space: {
-                nearBias: State.Slider(1, { min: -10, max: 10, step: 0.0001 }),
-                style: State.Select('nearby', { options: ['none', 'nearby'] })
-            }
+            style: State.Select('exp',
+                { options: ['min', 'pow', 'exp', 'smin'] }),
+            smooth: State.Slider(10, { min: -40, max: 40, step: 0.01 }),
+            limit: State.Slider(0.1, { min: 0, max: 2, step: 0.01 }),
+
+            // @todo Get these presets working:
+            presets: State.Section({
+                    pow: () => merge(state.distance,
+                        { style: 'pow', smooth: 5, limit: 0.5 }),
+                    exp: () => merge(state.distance,
+                        { style: 'exp', smooth: 10, limit: 0.1 }),
+                    smin: () => merge(state.distance,
+                        { style: 'smin', smooth: 0.2, limit: 0.25 })
+                },
+                { enumerable: false, label: 'Presets' })
+        },
+        edge: {
+            style: State.Select('smin',
+                { options: ['none', 'min', 'pow', 'exp', 'smin'] }),
+            smooth: State.Slider(0.06, { min: -40, max: 40, step: 0.01 }),
+            size: State.Slider(0.006, { min: -1, max: 1, step: 0.001 }),
+
+            // @todo Get these presets working:
+            presets: State.Section({
+                    pow: () => merge(state.distance, {
+                        style: 'pow',
+                        smooth: 7,
+                        size: 0.03
+                    }),
+                    smin: () => merge(state.distance, {
+                        style: 'smin',
+                        smooth: 0.06,
+                        size: 0.006
+                    })
+                },
+                { enumerable: false, label: 'Presets' })
+        },
+        space: {
+            style: State.Select('near',
+                { options: ['none', 'near', 'pow', 'exp', 'smin'] }),
+            bias: State.Slider(3, { min: -40, max: 40, step: 0.01 }),
+
+            // @todo Get these presets working:
+            presets: State.Section({
+                    near: () => merge(state.distance, {
+                        style: 'near',
+                        bias: 3
+                    }),
+                    pow: () => merge(state.distance, {
+                        style: 'pow',
+                        bias: 20
+                    }),
+                    exp: () => merge(state.distance, {
+                        style: 'exp',
+                        bias: 40
+                    })
+                },
+                { enumerable: false, label: 'Presets' })
         }
     });
 
@@ -59,9 +103,10 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         },
         speed: regl.prop('state.speed'),
         distLimit: regl.prop('state.distance.limit'),
-        smoothing: regl.prop('state.distance.smoothing.amount'),
-        borderSize: regl.prop('state.distance.border.size'),
-        nearBias: regl.prop('state.distance.space.nearBias')
+        distSmooth: regl.prop('state.distance.smooth'),
+        edgeSmooth: regl.prop('state.edge.smooth'),
+        edgeSize: regl.prop('state.edge.size'),
+        spaceBias: regl.prop('state.space.bias')
     };
 
     each((v, i) => {
@@ -75,18 +120,16 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
             state: {
                 imageCount: i,
                 cellCount: c,
-                distance: {
-                    smoothing: { style: s },
-                    border: { style: b },
-                    space: { style: n }
-                }
+                distance: { style: d },
+                edge: { style: b },
+                space: { style: s }
             }
         }) =>
         `#define imageCount ${i}\n`+
         `#define cellCount ${c}\n`+
-        `#define smoothingStyle smoothingStyle_${s}\n`+
-        `#define borderStyle borderStyle_${b}\n`+
-        `#define spaceStyle spaceStyle_${n}\n`+
+        `#define distStyle distStyle_${d}\n`+
+        `#define edgeStyle edgeStyle_${b}\n`+
+        `#define spaceStyle spaceStyle_${s}\n`+
         '\n'+
         frag;
 
