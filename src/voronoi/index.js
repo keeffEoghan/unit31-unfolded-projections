@@ -45,9 +45,10 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
             style: State.Select('smin',
                 { options: ['none', 'min', 'pow', 'exp', 'smin'] }),
             smooth: State.Slider(0.03, { min: -40, max: 40, step: 0.01 }),
-            size: State.Slider(0.001, { min: -1, max: 1, step: 0.001 }),
-            fade: State.Slider(0.001, { min: -10, max: 10, step: 0.001 }),
-            vignette: State.Slider(0.18, { min: -5, max: 5, step: 0.001 }),
+            size: State.Slider(0.001, { min: -10, max: 10, step: 0.001 }),
+            fade: State.Slider(0.002, { min: -10, max: 10, step: 0.001 }),
+            // fade: State.Slider(0.016, { min: -10, max: 10, step: 0.001 }),
+            vignette: State.Slider(0.12, { min: -5, max: 5, step: 0.001 }),
 
             // @todo Get these presets working:
             /* presets: State.Section({
@@ -67,7 +68,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         space: {
             style: State.Select('exp',
                 { options: ['none', 'near', 'pow', 'exp', 'smin'] }),
-            bias: State.Slider(7, { min: -40, max: 40, step: 0.01 }),
+            bias: State.Slider(8, { min: -40, max: 40, step: 0.01 }),
 
             // @todo Get these presets working:
             /* presets: State.Section({
