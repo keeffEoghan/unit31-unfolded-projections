@@ -22,8 +22,8 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
     // @todo Rethink this setup, object's copied into `controls-state`, lost reference.
     const state = out.state = State.Section({
         imageCount: State.Slider(15, { min: 1, max: maxImages, step: 1 }),
-        // cellCount: State.Slider(30, { min: 0, max: 100, step: 1 }),
-        cellCount: State.Slider(15, { min: 0, max: 100, step: 1 }),
+        // cellCount: State.Slider(0, { min: 0, max: 100, step: 1 }),
+        cellCount: State.Slider(20, { min: 0, max: 100, step: 1 }),
         speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
         distance: {
             style: State.Select('exp',
@@ -106,37 +106,43 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.416, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(9, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             1: {
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.473, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(9, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             2: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.538, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(5, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             3: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.478, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(5, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             4: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.556, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(3, { min: 0, max: 100, step: 1 })
             },
             5: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.502, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 })
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                spin: State.Slider(3, { min: 0, max: 100, step: 1 })
             }
         },
         draw: {
@@ -156,6 +162,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         edgeFade: [],
         fillCurve: [],
         rings: [],
+        ringSpins: [],
         levels: []
     };
 
@@ -221,18 +228,28 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         },
         range(maxImages));
 
-    each((v, i) => uniforms[`rings[${i}]`] = (c, { state: { rings } }) => {
-            const { rings: r } = cache;
-            const ring = rings[i];
-            const v = (r[i] || (r[i] = []));
+    each((v, i) => {
+            uniforms[`rings[${i}]`] = (c, { state: { rings } }) => {
+                const { rings: r } = cache;
+                const ring = rings[i];
+                const v = (r[i] || (r[i] = []));
 
-            r.length = rings.length;
-            v[0] = ring.x;
-            v[1] = ring.y;
-            v[2] = ring.radius;
-            v[3] = ring.splits;
+                r.length = rings.length;
+                v[0] = ring.x;
+                v[1] = ring.y;
+                v[2] = ring.radius;
+                v[3] = ring.splits;
 
-            return v;
+                return v;
+            };
+
+            uniforms[`ringSpins[${i}]`] = (c, { state: { rings } }) => {
+                const { ringSpins: r } = cache;
+
+                r.length = rings.length;
+
+                return r[i] = rings[i].spin;
+            };
         },
         state.value.rings);
 

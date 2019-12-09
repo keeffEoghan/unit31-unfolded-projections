@@ -35,6 +35,7 @@ precision highp float;
 uniform sampler2D images[imageCount];
 uniform vec3 shapes[imageCount];
 uniform vec4 rings[ringCount];
+uniform float ringSpins[ringCount];
 uniform float tick;
 uniform float speed;
 uniform float distLimit;
@@ -156,7 +157,7 @@ vec2 getCell(in float index) {
             vec4 ring = rings[i];
 
             if((splitsCount += ring.w) > index) {
-                float angle = tau*((t+index-splitsCount)/ring.w);
+                float angle = tau*(((t*ringSpins[i])+index-splitsCount)/ring.w);
 
                 return ring.xy+(vec2(cos(angle), sin(angle))*ring.z);
             }
@@ -393,7 +394,8 @@ float mapEdge(in float edge, in float size, in vec3 fade) {
 
 void main() {
     vec2 st = map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
-    vec2 xy = uv/aspectContain(viewShape);
+    vec2 aspectMaskView = aspectCover(maskShape/viewShape);
+    vec2 xy = uv*aspectMaskView/aspectCover(maskShape);
     float vignette = dot(xy, xy);
     Voronoi voronoi = getVoronoi(xy);
     float dist = voronoi.dist/distLimit;
@@ -430,14 +432,19 @@ void main() {
         vec4 color = mix(vec4(0), vec4(colorMixed, image.a), clamp(edge, 0.0, 1.0));
     #endif
 
-    vec2 maskUV = map(xy*aspectCover(maskShape),
+    // vec2 maskUV = map(xy*aspectCover(maskShape),
+    vec2 maskUV = map(uv*aspectMaskView,
         ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
 
     color = clamp(color*levels*texture2D(mask, maskUV), 0.0, 1.0);
+    // color = clamp(color*levels*texture2D(mask, xy), 0.0, 1.0);
 
     #ifdef premultiplyAlpha
         gl_FragColor = vec4(color.rgb*color.a, color.a);
     #else
         gl_FragColor = color;
     #endif
+
+    // gl_FragColor = vec4(xy, 0.0, 1.0);
+    // gl_FragColor = vec4(maskUV, 0.0, 1.0);
 }
