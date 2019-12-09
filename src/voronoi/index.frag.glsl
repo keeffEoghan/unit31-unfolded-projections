@@ -34,12 +34,15 @@ precision highp float;
 
 uniform sampler2D images[imageCount];
 uniform vec3 shapes[imageCount];
-uniform vec2 viewShape;
+uniform vec4 rings[ringCount];
 uniform float tick;
 uniform float speed;
 uniform float distLimit;
 uniform vec4 fillCurve;
-uniform vec4 mask;
+uniform vec4 levels;
+uniform sampler2D mask;
+uniform vec2 maskShape;
+uniform vec2 viewShape;
 
 #if distStyle != distStyle_min
     uniform float distSmooth;
@@ -103,6 +106,8 @@ varying vec2 uv;
 const vec4 ndcRange = vec4(-1, -1, 1, 1);
 const vec4 stRange = vec4(0, 0, 1, 1);
 
+// #pragma glslify: blur = require('glsl-hash-blur', sample=tex, iterations=20);
+
 #pragma glslify: map = require('glsl-map');
 #pragma glslify: noise = require('glsl-noise/simplex/2d');
 #pragma glslify: aspectCover = require('glsl-aspect/cover');
@@ -122,6 +127,8 @@ const vec4 stRange = vec4(0, 0, 1, 1);
 
 const float epsilon = 0.0000001;
 const float infinity = 100000000.0;
+const float pi = 3.14159265359;
+const float tau = 6.28318530718;
 
 struct Voronoi {
     #if edgeStyle != edgeStyle_none
@@ -142,7 +149,22 @@ struct Voronoi {
 vec2 getCell(in float index) {
     float t = tick*speed;
 
-    return vec2(noise(vec2(t, index*1234.5678)), noise(vec2(t, index*5678.1234)));
+    if(index < float(ringSplitsCount)) {
+        float splitsCount = 0.0;
+
+        for(int i = 0; i < ringCount; ++i) {
+            vec4 ring = rings[i];
+
+            if((splitsCount += ring.w) > index) {
+                float angle = tau*((t+index-splitsCount)/ring.w);
+
+                return ring.xy+(vec2(cos(angle), sin(angle))*ring.z);
+            }
+        }
+    }
+    else {
+        return vec2(noise(vec2(t, index*1234.5678)), noise(vec2(t, index*5678.1234)));
+    }
 }
 
 vec2 getCell(in int index) {
@@ -308,7 +330,7 @@ float countImageLODs(in vec2 shape) {
 
 vec4 getImage(in int index, in vec2 st, in float lod) {
     // @todo Replace with texture atlas lookup - will cut out these loops anyway
-    vec4 image;
+    vec4 image = vec4(1.0);
 
     for(int i = 0; i < imageCount; ++i) {
         if(i == index) {
@@ -324,6 +346,15 @@ vec4 getImage(in int index, in vec2 st, in float lod) {
                 // between 2 already-defined levels-of-detail.
                 image = texture2D(images[i], uv, -1.0+(lod*nLOD));
             #endif
+
+            // @todo Would need to unroll the loops for image sampler function.
+            // vec3 tex(vec2 uv) {
+            //     return texture2D(iChannel0, uv).rgb;
+            // }
+
+            // image.rgb = blur(st, blurRadius*lod/min(shape.x, shape.y),
+            //     aspectCover(shape)/aspectContain(viewShape),
+            //     time);
 
             break;
         }
@@ -344,7 +375,7 @@ vec4 getImage(in float index, in vec2 st) {
     return getImage(int(index), st);
 }
 
-float mapSpaceToLOD(in float space) {
+float mapSpaceToBlur(in float space) {
     return bezier(1.0, 0.0, 1.0, 0.0, space);
 }
 
@@ -363,43 +394,46 @@ float mapEdge(in float edge, in float size, in vec3 fade) {
 void main() {
     vec2 st = map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
     vec2 xy = uv/aspectContain(viewShape);
-
+    float vignette = dot(xy, xy);
     Voronoi voronoi = getVoronoi(xy);
-
-    float dist = clamp(voronoi.dist/distLimit, 0.0, 1.0);
+    float dist = voronoi.dist/distLimit;
     int imageIndex = int(mod(voronoi.index, float(imageCount)));
 
-    #if edgeStyle != edgeStyle_none
-        float edge = mapEdge(voronoi.edge, edgeSize, vec3(edgeFade, dot(xy, xy)));
+    #if spaceStyle == spaceStyle_none
+        float colorMix = 0.0;
+        float fill = 1.0;
     #else
-        float edge = 1.0;
+        float colorMix = max(mapSpaceToColor(clamp(voronoi.space, 0.0, 1.0)), 0.0);
+        float fill = clamp(mapSpaceToFill(voronoi.space), 0.0, 1.0);
     #endif
 
-    #if spaceStyle != spaceStyle_none
-        float colorMix = max(mapSpaceToColor(clamp(voronoi.space, 0.0, 1.0)), 0.0);
-        float fill = mapSpaceToFill(voronoi.space);
-
-        #ifdef drawTest
-            vec4 color = vec4(fill, dist, edge, 1.0);
-        #else
-            vec4 image = getImage(imageIndex, st, mapSpaceToLOD(voronoi.space));
-
-            // Brighten and saturate.
-            vec3 mixed = vec3((image.rgb+colorMix)*(1.0+colorMix));
-
-            vec4 color = mix(vec4(0), vec4(mixed, image.a),
-                clamp(mapEdge(mix(1.0-(voronoi.dist/distLimit), voronoi.edge,
-                        clamp(fill, 0.0, 1.0)),
-                        edgeSize,
-                        vec3(edgeFade, 1.0+dot(xy, xy))),
-                    0.0, 1.0));
-        #endif
+    #if edgeStyle == edgeStyle_none
+        float edge = 1.0;
+    #elif spaceStyle == spaceStyle_none
+        float edge = mapEdge(voronoi.edge, edgeSize, vec3(edgeFade, vignette));
     #else
+        // Mix between the centroid distance and edge distance according to space.
+        float edge = mapEdge(mix(1.0-dist, voronoi.edge, fill),
+                edgeSize, vec3(edgeFade, 1.0+vignette));
+    #endif
+
+    #ifdef drawTest
+        vec4 color = vec4(fill, dist, edge, 1.0);
+    #elif spaceStyle == spaceStyle_none || edgeStyle == edgeStyle_none
         vec4 image = getImage(imageIndex, st);
         vec4 color = mix(vec4(0), image, (1.0-dist)*edge);
+    #else
+        vec4 image = getImage(imageIndex, st, mapSpaceToBlur(voronoi.space));
+
+        // Brighten and saturate.
+        vec3 colorMixed = vec3((image.rgb+colorMix)*(1.0+colorMix));
+        vec4 color = mix(vec4(0), vec4(colorMixed, image.a), clamp(edge, 0.0, 1.0));
     #endif
 
-    color = clamp(color*mask, 0.0, 1.0);
+    vec2 maskUV = map(xy*aspectCover(maskShape),
+        ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+
+    color = clamp(color*levels*texture2D(mask, maskUV), 0.0, 1.0);
 
     #ifdef premultiplyAlpha
         gl_FragColor = vec4(color.rgb*color.a, color.a);

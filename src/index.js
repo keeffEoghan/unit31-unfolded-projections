@@ -25,10 +25,19 @@ const regl = self.regl = getRegl({
 
 const assets = { sources: [], images: [], textures: [], shapes: [] };
 
+const mask = {
+    image: new Image(),
+    texture: regl.texture()
+};
+
+mask.image.addEventListener('load', () => mask.texture(mask.image));
+mask.image.src = basePath+'assets/mask/borders.png';
+
 const voronoi = getVoronoi(regl, {
     images: assets.textures,
     shapes: assets.shapes,
-    maxImages: regl.limits.maxTextureUnits
+    maxImages: regl.limits.maxTextureUnits-1,
+    mask: mask.texture
 });
 
 const state = State({
@@ -66,15 +75,15 @@ function updateImages() {
         assets.shapes.length = 0;
 
     map((v, i) => {
-            const source = `${basePath}assets/${i}.jpg`;
+            const source = basePath+`assets/photos/${i}.jpg`;
 
             const image = assets.images[i] = new Image();
             const texture = assets.textures[i] = regl.texture();
             const shape = assets.shapes[i] = [1, 1, 1];
 
             image.addEventListener('load', () => {
-                // texture({ data: image, min: 'mipmap', mipmap: 'nice' });
-                texture(image);
+                // texture({ data: image, mag: 'linear', min: 'mipmap', mipmap: 'nice' });
+                texture({ data: image, mag: 'linear', min: 'linear' });
 
                 shape[2] = countImageLODs((shape[0] = texture.width),
                     (shape[1] = texture.height));
