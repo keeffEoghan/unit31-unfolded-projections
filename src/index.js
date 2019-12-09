@@ -23,6 +23,12 @@ const regl = self.regl = getRegl({
     optionalExtensions
 });
 
+const canvas = document.querySelector('canvas');
+
+document.addEventListener('fullscreenchange', () =>
+    ((document.fullscreenElement === canvas) &&
+        self.dispatchEvent(new Event('resize'))));
+
 const assets = { sources: [], images: [], textures: [], shapes: [] };
 
 const mask = {
@@ -41,6 +47,7 @@ const voronoi = getVoronoi(regl, {
 });
 
 const state = State({
+    fullscreen: () => canvas.requestFullscreen(),
     voronoi: voronoi.state,
     presets: State.Section({
             simple: () => merge(state, {})

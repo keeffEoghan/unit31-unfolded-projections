@@ -375,7 +375,7 @@ vec4 getImage(in int index, in vec2 st, in vec2 pivot, in float lod) {
             // vec2 relative = rotate(pi*-0.5)*(st-pivot);
 
             // vec2 uv = (mirrorUV(aspectContain(shape.xy/viewShape)*(rotate(pi*0.5)*st)));
-            vec2 uv = mirrorUV(aspectContain(shape.xy/viewShape)*st);
+            vec2 uv = mirrorUV(aspectContain(shape.xy/viewShape)*(st-pivot));
             // float nLOD = countImageLODs(shape);
             float nLOD = shape.z;
 
