@@ -38,12 +38,15 @@ uniform vec4 rings[ringCount];
 uniform float ringSpins[ringCount];
 uniform float tick;
 uniform float speed;
+uniform float noiseScale;
 uniform float distLimit;
 uniform vec4 fillCurve;
 uniform vec4 levels;
 uniform sampler2D mask;
 uniform vec2 maskShape;
+uniform float maskStrength;
 uniform vec2 viewShape;
+uniform float imageScale;
 
 #if distStyle != distStyle_min
     uniform float distSmooth;
@@ -164,7 +167,8 @@ vec2 getCell(in float index) {
         }
     }
     else {
-        return vec2(noise(vec2(t, index*1234.5678)), noise(vec2(t, index*5678.1234)));
+        return vec2(noise(vec2(t, index*123.4567)), noise(vec2(t, index*56.781234)))*
+            noiseScale;
     }
 }
 
@@ -329,6 +333,12 @@ float countImageLODs(in vec2 shape) {
     return countImageLODs(shape.x, shape.y);
 }
 
+vec2 mirrorUV(in vec2 uv) {
+    vec2 f = fract(uv);
+
+    return abs(mix(f, vec2(1.0)-f, step(0.0, mod(uv, 2.0)-1.0)));
+}
+
 vec4 getImage(in int index, in vec2 st, in float lod) {
     // @todo Replace with texture atlas lookup - will cut out these loops anyway
     vec4 image = vec4(1.0);
@@ -336,7 +346,7 @@ vec4 getImage(in int index, in vec2 st, in float lod) {
     for(int i = 0; i < imageCount; ++i) {
         if(i == index) {
             vec3 shape = shapes[i];
-            vec2 uv = st*aspectContain(shape.xy/viewShape);
+            vec2 uv = mirrorUV(st*aspectContain(shape.xy/viewShape));
             // float nLOD = countImageLODs(shape);
             float nLOD = shape.z;
 
@@ -381,11 +391,15 @@ float mapSpaceToBlur(in float space) {
 }
 
 float mapSpaceToColor(in float space) {
-    return bezier(100.0, 2.0, 0.5, 0.0, space);
+    return bezier(10.0, 2.0, 0.5, 0.0, space);
 }
 
 float mapSpaceToFill(in float space) {
     return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3], space);
+}
+
+float mapSpaceToUV(in float space) {
+    return bezier(40.0, 40.0, 40.0, 1.0, space);
 }
 
 float mapEdge(in float edge, in float size, in vec3 fade) {
@@ -393,7 +407,6 @@ float mapEdge(in float edge, in float size, in vec3 fade) {
 }
 
 void main() {
-    vec2 st = map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
     vec2 aspectMaskView = aspectCover(maskShape/viewShape);
     vec2 xy = uv*aspectMaskView/aspectCover(maskShape);
     float vignette = dot(xy, xy);
@@ -422,29 +435,30 @@ void main() {
     #ifdef drawTest
         vec4 color = vec4(fill, dist, edge, 1.0);
     #elif spaceStyle == spaceStyle_none || edgeStyle == edgeStyle_none
-        vec4 image = getImage(imageIndex, st);
+        vec2 st = map(uv/imageScale, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+        vec4 image = getImage(imageIndex, st-voronoi.cell);
         vec4 color = mix(vec4(0), image, (1.0-dist)*edge);
     #else
-        vec4 image = getImage(imageIndex, st, mapSpaceToBlur(voronoi.space));
+        vec2 st = map(uv/(imageScale*mapSpaceToUV(clamp(voronoi.space, 0.0, 1.0))),
+                ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+
+        vec4 image = getImage(imageIndex, st-voronoi.cell,
+            mapSpaceToBlur(voronoi.space));
 
         // Brighten and saturate.
         vec3 colorMixed = vec3((image.rgb+colorMix)*(1.0+colorMix));
         vec4 color = mix(vec4(0), vec4(colorMixed, image.a), clamp(edge, 0.0, 1.0));
     #endif
 
-    // vec2 maskUV = map(xy*aspectCover(maskShape),
     vec2 maskUV = map(uv*aspectMaskView,
         ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
 
-    color = clamp(color*levels*texture2D(mask, maskUV), 0.0, 1.0);
-    // color = clamp(color*levels*texture2D(mask, xy), 0.0, 1.0);
+    color = clamp(color*levels, 0.0, 1.0)*
+        clamp(pow(texture2D(mask, maskUV), vec4(maskStrength)), 0.0, 1.0);
 
     #ifdef premultiplyAlpha
         gl_FragColor = vec4(color.rgb*color.a, color.a);
     #else
         gl_FragColor = color;
     #endif
-
-    // gl_FragColor = vec4(xy, 0.0, 1.0);
-    // gl_FragColor = vec4(maskUV, 0.0, 1.0);
 }

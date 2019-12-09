@@ -82,8 +82,11 @@ function updateImages() {
             const shape = assets.shapes[i] = [1, 1, 1];
 
             image.addEventListener('load', () => {
-                // texture({ data: image, mag: 'linear', min: 'mipmap', mipmap: 'nice' });
-                texture({ data: image, mag: 'linear', min: 'linear' });
+                // @todo Power-of-two...
+                texture({ data: image,
+                    // wrap: 'mirror',
+                    // mag: 'linear', min: 'mipmap', mipmap: 'nice' });
+                    mag: 'linear', min: 'linear' });
 
                 shape[2] = countImageLODs((shape[0] = texture.width),
                     (shape[1] = texture.height));
