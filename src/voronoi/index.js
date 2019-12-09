@@ -23,7 +23,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
             { min: 1, max: regl.limits.maxTextureUnits, step: 1 }),
 
         cellCount: State.Slider(30, { min: 0, max: 100, step: 1 }),
-        speed: State.Slider(1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
+        speed: State.Slider(0.1/60, { min: -2/60, max: 2/60, step: 0.01/60 }),
         distance: {
             style: State.Select('exp',
                 { options: ['min', 'pow', 'exp', 'smin'] }),
@@ -44,11 +44,10 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         edge: {
             style: State.Select('smin',
                 { options: ['none', 'min', 'pow', 'exp', 'smin'] }),
-            smooth: State.Slider(0.03, { min: -40, max: 40, step: 0.01 }),
+            smooth: State.Slider(0.05, { min: -40, max: 40, step: 0.01 }),
             size: State.Slider(0.001, { min: -10, max: 10, step: 0.001 }),
-            fade: State.Slider(0.002, { min: -10, max: 10, step: 0.001 }),
-            // fade: State.Slider(0.016, { min: -10, max: 10, step: 0.001 }),
-            vignette: State.Slider(0.12, { min: -5, max: 5, step: 0.001 }),
+            fade: State.Slider(0.005, { min: -10, max: 10, step: 0.001 }),
+            vignette: State.Slider(-4, { min: -5, max: 5, step: 0.001 }),
 
             // @todo Get these presets working:
             /* presets: State.Section({
@@ -87,18 +86,19 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
                 },
                 { enumerable: false, label: 'Presets' }) */
         },
+        fillCurve: [
+            State.Slider(0, { min: -3, max: 3, step: 0.01 }),
+            State.Slider(0.333, { min: -3, max: 3, step: 0.01 }),
+            State.Slider(0.666, { min: -3, max: 3, step: 0.01 }),
+            State.Slider(1, { min: -3, max: 3, step: 0.01 })
+        ],
         draw: {
+            premultiplyAlpha: false,
             test: false,
             red: State.Slider(1, { min: 0, max: 1, step: 0.01 }),
             green: State.Slider(1, { min: 0, max: 1, step: 0.01 }),
             blue: State.Slider(1, { min: 0, max: 1, step: 0.01 }),
             alpha: State.Slider(1, { min: 0, max: 1, step: 0.01 })
-
-            // test: true,
-            // red: State.Slider(0, { min: 0, max: 1, step: 0.01 }),
-            // green: State.Slider(0, { min: 0, max: 1, step: 0.01 }),
-            // blue: State.Slider(1, { min: 0, max: 1, step: 0.01 }),
-            // alpha: State.Slider(1, { min: 0, max: 1, step: 0.01 })
         }
     });
 
@@ -106,6 +106,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         props: {},
         viewShape: [],
         edgeFade: [],
+        fillCurve: [],
         mask: []
     };
 
@@ -134,6 +135,16 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
             return edgeFade;
         },
         spaceBias: regl.prop('state.space.bias'),
+        fillCurve: (c, { state: { fillCurve: f } }) => {
+            const { fillCurve } = cache;
+
+            fillCurve[0] = f[0];
+            fillCurve[1] = f[1];
+            fillCurve[2] = f[2];
+            fillCurve[3] = f[3];
+
+            return fillCurve;
+        },
         mask: (c, { state: { draw: { red: r, green: g, blue: b, alpha: a } } }) => {
             const { mask } = cache;
 
@@ -160,7 +171,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
                 distance: { style: d },
                 edge: { style: b },
                 space: { style: s },
-                draw: { test: t }
+                draw: { test: t, premultiplyAlpha: a }
             }
         }) =>
         `#define imageCount ${i}\n`+
@@ -169,6 +180,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length }) 
         `#define edgeStyle edgeStyle_${b}\n`+
         `#define spaceStyle spaceStyle_${s}\n`+
         ((t)? `#define drawTest\n` : '')+
+        ((a)? `#define premultiplyAlpha\n` : '')+
         '\n'+
         frag;
 

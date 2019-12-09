@@ -35,9 +35,10 @@ precision highp float;
 uniform sampler2D images[imageCount];
 uniform vec3 shapes[imageCount];
 uniform vec2 viewShape;
-uniform float time;
+uniform float tick;
 uniform float speed;
 uniform float distLimit;
+uniform vec4 fillCurve;
 uniform vec4 mask;
 
 #if distStyle != distStyle_min
@@ -139,7 +140,7 @@ struct Voronoi {
 // @todo Replace this with a more interesting movement.
 // @todo Replace this with lookup into points buffer.
 vec2 getCell(in float index) {
-    float t = time*speed;
+    float t = tick*speed;
 
     return vec2(noise(vec2(t, index*1234.5678)), noise(vec2(t, index*5678.1234)));
 }
@@ -348,36 +349,19 @@ float mapSpaceToLOD(in float space) {
 }
 
 float mapSpaceToColor(in float space) {
-    return bezier(10e3, 0.3, 0.0, 0.0, space);
+    return bezier(100.0, 2.0, 0.5, 0.0, space);
 }
 
 float mapSpaceToFill(in float space) {
-    const float scale = 1.0;
-
-    // return bezier(0.0, 0.0, 0.0, 1.0, space)*0.1;
-
-    const float f0 = 0.0;
-    const float f1 = 0.05;
-    const float f2 = 0.1;
-    const float f3 = 2.0;
-
-    float f0f1 = f1-f0;
-    float f1f2 = f2-f1;
-    float f2f3 = f3-f2;
-
-    return scale*
-        ((bezier(0.0, 1.0, 0.0, 1.0, clamp(space, f0, f1))*f0f1)+
-        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, f1, f2))*f1f2)+
-        (bezier(0.0, 1.0, 0.0, 1.0, clamp(space, f2, f3))*f2f3));
+    return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3], space);
 }
 
 float mapEdge(in float edge, in float size, in vec3 fade) {
-    return (edge-size)/fade[0]*pow(fade[2], fade[1]);
+    return clamp(edge-size, 0.0, 1.0)/fade[0]*pow(fade[2], fade[1]);
 }
 
 void main() {
     vec2 st = map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
-    // vec2 xy = uv/aspectCover(viewShape);
     vec2 xy = uv/aspectContain(viewShape);
 
     Voronoi voronoi = getVoronoi(xy);
@@ -392,48 +376,23 @@ void main() {
     #endif
 
     #if spaceStyle != spaceStyle_none
-        float colorMix = mapSpaceToColor(clamp(voronoi.space, 0.0, 1.0));
+        float colorMix = max(mapSpaceToColor(clamp(voronoi.space, 0.0, 1.0)), 0.0);
         float fill = mapSpaceToFill(voronoi.space);
 
         #ifdef drawTest
-            vec4 color = vec4(fill, 1.0-dist, edge, 1.0);
+            vec4 color = vec4(fill, dist, edge, 1.0);
         #else
             vec4 image = getImage(imageIndex, st, mapSpaceToLOD(voronoi.space));
-            // vec4 mixed = clamp(vec4(image.rgb+colorMix, image.a), 0.0, 1.0);
-            vec4 mixed = clamp(vec4(image.rgb*(1.0+colorMix), image.a), 0.0, 1.0);
-            // vec4 mixed = clamp(vec4(pow(image.rgb, colorMix), image.a), 0.0, 1.0);
 
-            vec4 color = mix(vec4(0), mixed,
-                // clamp(fill*edge-dist, 0.0, 1.0));
-                // clamp(fill*edge, 0.0, 1.0));
-                // clamp(mapEdge(voronoi.edge, edgeSize,
-                //         vec3(fill*edgeFade, dot(xy, xy)))*fill,
-                //     0.0, 1.0));
-                clamp(mapEdge((voronoi.edge*fill)-voronoi.dist,
+            // Brighten and saturate.
+            vec3 mixed = vec3((image.rgb+colorMix)*(1.0+colorMix));
+
+            vec4 color = mix(vec4(0), vec4(mixed, image.a),
+                clamp(mapEdge(mix(1.0-(voronoi.dist/distLimit), voronoi.edge,
+                        clamp(fill, 0.0, 1.0)),
                         edgeSize,
-                        vec3(edgeFade*fill, dot(xy, xy))),
+                        vec3(edgeFade, 1.0+dot(xy, xy))),
                     0.0, 1.0));
-
-            // vec3 hsl = rgbToHSL(image.rgb);
-            // vec3 hsl = rgb_to_hsl(image.rgb);
-            // vec4 rgba = vec4(hsl_to_rgb(hsl.x, min(hsl.y+colorMix, 0.0), hsl.z), image.a);
-            // vec4 rgba = vec4(hsl_to_rgb(hsl), image.a);
-            // vec4 rgba = vec4(hslToRGB(hsl.x, min(hsl.y+colorMix, 0.0), hsl.z), image.a);
-            // vec4 rgba = vec4(hslToRGB(hsl), image.a);
-            // vec4 rgba = image;
-
-            // vec4 color = mix(vec4(0), rgba,
-            //     clamp(mix((1.0-dist)+fill, edge, fill), 0.0, 1.0));
-
-            // vec4 color = vec4(hsl_to_rgb(rgb_to_hsl(image.rgb)), 1.0);
-            // vec4 color = vec4(vec3(distance(image.rgb, hsl_to_rgb(rgb_to_hsl(image.rgb)))),
-            //     1.0);
-            // vec4 color = vec4(hsv_to_rgb(rgb_to_hsv(image.rgb)), 1.0);
-            // vec4 color = vec4(vec3(distance(image.rgb, hsv_to_rgb(rgb_to_hsv(image.rgb)))),
-            //     1.0);
-            // vec4 color = vec4(hslToRGB(rgbToHSL(image.rgb)), 1.0);
-            // vec4 color = vec4(vec3(distance(image.rgb, hslToRGB(rgbToHSL(image.rgb)))),
-            //     1.0);
         #endif
     #else
         vec4 image = getImage(imageIndex, st);
@@ -442,6 +401,9 @@ void main() {
 
     color = clamp(color*mask, 0.0, 1.0);
 
-    gl_FragColor = vec4(color.rgb*color.a, color.a);
-    // gl_FragColor = color;
+    #ifdef premultiplyAlpha
+        gl_FragColor = vec4(color.rgb*color.a, color.a);
+    #else
+        gl_FragColor = color;
+    #endif
 }
