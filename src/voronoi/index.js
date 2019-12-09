@@ -23,18 +23,20 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
     const state = out.state = State.Section({
         imageScale: State.Slider(0.4, { min: 0, max: 10, step: 0.01 }),
         imageCount: State.Slider(15, { min: 1, max: maxImages, step: 1 }),
-        // cellCount: State.Slider(0, { min: 0, max: 100, step: 1 }),
+        // cellCount: State.Slider(1, { min: 0, max: 100, step: 1 }),
         cellCount: State.Slider(20, { min: 0, max: 100, step: 1 }),
         maskStrength: State.Slider(2, { min: 0, max: 10, step: 0.001 }),
+        // maskStrength: State.Slider(0, { min: 0, max: 10, step: 0.001 }),
         speed: State.Slider(0.0007, { min: -2/60, max: 2/60, step: 0.01/60 }),
         noiseScale: State.Slider(0.87, { min: -50, max: 50, step: 0.01 }),
         distance: {
             style: State.Select('exp',
                 { options: ['min', 'pow', 'exp', 'smin'] }),
-            // smooth: State.Slider(27, { min: -40, max: 40, step: 0.01 }),
+            // smooth: State.Slider(27, { min: -80, max: 80, step: 0.01 }),
             // limit: State.Slider(0.005, { min: 0, max: 2, step: 0.001 }),
-            smooth: State.Slider(40, { min: -40, max: 40, step: 0.01 }),
-            limit: State.Slider(0.018, { min: 0, max: 2, step: 0.001 }),
+            smooth: State.Slider(80, { min: -80, max: 80, step: 0.01 }),
+            limit: State.Slider(0.013, { min: 0, max: 10, step: 0.001 }),
+            // limit: State.Slider(10, { min: 0, max: 10, step: 0.001 }),
 
             // @todo Get these presets working:
             /*presets: State.Section({
@@ -50,7 +52,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         edge: {
             style: State.Select('smin',
                 { options: ['none', 'min', 'pow', 'exp', 'smin'] }),
-            smooth: State.Slider(0.05, { min: -40, max: 40, step: 0.01 }),
+            smooth: State.Slider(0.05, { min: -80, max: 80, step: 0.01 }),
             size: State.Slider(0.001, { min: -10, max: 10, step: 0.001 }),
             fade: State.Slider(0.005, { min: -10, max: 10, step: 0.001 }),
             vignette: State.Slider(-4, { min: -5, max: 5, step: 0.001 }),
@@ -73,8 +75,8 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         space: {
             style: State.Select('exp',
                 { options: ['none', 'near', 'pow', 'exp', 'smin'] }),
-            // bias: State.Slider(8, { min: -40, max: 40, step: 0.01 }),
-            bias: State.Slider(14, { min: -40, max: 40, step: 0.01 }),
+            // bias: State.Slider(8, { min: -80, max: 80, step: 0.01 }),
+            bias: State.Slider(14, { min: -80, max: 80, step: 0.01 }),
 
             // @todo Get these presets working:
             /* presets: State.Section({
@@ -110,6 +112,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.473, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             1: {
@@ -117,6 +120,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.416, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             2: {
@@ -124,6 +128,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.538, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             3: {
@@ -131,6 +136,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.478, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             4: {
@@ -138,6 +144,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.556, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             },
             5: {
@@ -145,6 +152,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.502, { min: 0, max: 2, step: 0.001 }),
                 splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             }
 
