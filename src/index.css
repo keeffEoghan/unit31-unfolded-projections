@@ -16,3 +16,7 @@ body {
 .controls {
     z-index: 100;
 }
+
+canvas {
+    cursor: none;
+}

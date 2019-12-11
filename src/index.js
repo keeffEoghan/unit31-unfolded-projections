@@ -2,6 +2,7 @@ import getRegl from 'regl';
 import State from 'controls-state';
 import GUI from 'controls-gui';
 import merge from 'lodash-es/merge';
+import vkey from 'vkey';
 import { range, map, each } from 'array-utils';
 import { getBasePath } from 'get-base-path';
 
@@ -24,10 +25,10 @@ const regl = self.regl = getRegl({
 });
 
 const canvas = document.querySelector('canvas');
+const fullscreen = () => canvas.requestFullscreen();
 
 document.addEventListener('fullscreenchange', () =>
-    ((document.fullscreenElement === canvas) &&
-        self.dispatchEvent(new Event('resize'))));
+    self.dispatchEvent(new Event('resize')));
 
 const assets = { sources: [], images: [], textures: [], shapes: [] };
 
@@ -47,7 +48,7 @@ const voronoi = getVoronoi(regl, {
 });
 
 const state = State({
-    fullscreen: () => canvas.requestFullscreen(),
+    fullscreen,
     voronoi: voronoi.state,
     presets: State.Section({
             simple: () => merge(state, {})
@@ -130,4 +131,15 @@ regl.frame(({ drawingBufferWidth: w, drawingBufferHeight: h }) => {
     // voronoi.framebuffer.resize(w, h);
     // voronoi.framebuffer.use(drawVoronoi);
     drawVoronoi();
+});
+
+const keyMap = {
+    'F': fullscreen
+};
+
+document.addEventListener('keyup', ({ keyCode }) => {
+    const key = vkey[keyCode];
+    const f = keyMap[key];
+
+    (f && f());
 });

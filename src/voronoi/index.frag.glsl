@@ -47,6 +47,7 @@ uniform vec2 maskShape;
 uniform float maskStrength;
 uniform vec2 viewShape;
 uniform float imageScale;
+uniform vec2 vignette;
 
 #if distStyle != distStyle_min
     uniform float distSmooth;
@@ -66,8 +67,7 @@ uniform float imageScale;
 #endif
 
 #if edgeStyle != edgeStyle_none
-    uniform float edgeSize;
-    uniform vec2 edgeFade;
+    uniform vec2 edgeSizeFade;
 
     #if edgeStyle != edgeStyle_min
         uniform float edgeSmooth;
@@ -424,21 +424,43 @@ float mapSpaceToColor(in float space) {
 }
 
 float mapSpaceToFill(in float space) {
-    return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3], space);
+    return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3],
+        space);
 }
 
 float mapSpaceToUV(in float space) {
     return bezier(20.0, 20.0, 2.0, 1.0, space);
 }
 
-float mapEdge(in float edge, in float size, in vec3 fade) {
-    return clamp(edge-size, 0.0, 1.0)/fade[0]*pow(fade[2], fade[1]);
+float mapEdge(in float edge, in float size, in float fade, in float scale) {
+    return clamp(edge-size, 0.0, 1.0)/fade*scale;
+}
+
+float mapEdge(in float edge, in vec3 factors) {
+    return mapEdge(edge, factors.x, factors.y, factors.z);
+}
+
+float getVignetteDist(in vec2 pos, in float strength, in float smoothing) {
+    // return pow(1.0+dot(pos, pos), strength);
+    float v = infinity;
+
+    for(int i = 0; i < ringCount; ++i) {
+        vec2 toMid = rings[i].xy-pos;
+
+        v = smin(v, dot(toMid, toMid), smoothing);
+    }
+
+    return pow(1.0+v, strength);
+}
+
+float getVignetteDist(in vec2 pos, in vec2 vignette) {
+    return getVignetteDist(pos, vignette.x, vignette.y);
 }
 
 void main() {
     vec2 aspectMaskView = aspectCover(maskShape/viewShape);
     vec2 xy = uv*aspectMaskView/aspectCover(maskShape);
-    float vignette = dot(xy, xy);
+    float vignetteDist = getVignetteDist(xy, vignette);
     Voronoi voronoi = getVoronoi(xy);
     float dist = voronoi.dist/distLimit;
     int imageIndex = int(mod(voronoi.index, float(imageCount)));
@@ -447,21 +469,25 @@ void main() {
         float colorMix = 0.0;
         float fill = 1.0;
     #else
-        float colorMix = max(mapSpaceToColor(clamp(voronoi.space, 0.0, 1.0)), 0.0);
+        float colorMix = max(mapSpaceToColor(clamp(voronoi.space,
+            0.0, 1.0)), 0.0);
+
         float fill = clamp(mapSpaceToFill(voronoi.space), 0.0, 1.0);
     #endif
 
     #if edgeStyle == edgeStyle_none
         float edge = 1.0;
     #elif spaceStyle == spaceStyle_none
-        float edge = mapEdge(voronoi.edge, edgeSize, vec3(edgeFade, vignette));
+        float edge = mapEdge(voronoi.edge,
+            edgeSizeFade.x, edgeSizeFade.y, vignetteDist);
     #else
         // Mix between the centroid distance and edge distance according to space.
         float edge = mapEdge(mix(1.0-dist, voronoi.edge, fill),
-                edgeSize, vec3(edgeFade, 1.0+vignette));
+            edgeSizeFade.x, edgeSizeFade.y, vignetteDist);
     #endif
 
     #ifdef drawTest
+        // vec4 color = vec4(voronoi.fill, voronoi.dist, voronoi.edge, 1.0);
         vec4 color = vec4(fill, dist, edge, 1.0);
     #elif spaceStyle == spaceStyle_none || edgeStyle == edgeStyle_none
         vec2 st = map(uv/imageScale, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);

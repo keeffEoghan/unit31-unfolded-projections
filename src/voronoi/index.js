@@ -25,18 +25,18 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         imageCount: State.Slider(15, { min: 1, max: maxImages, step: 1 }),
         // cellCount: State.Slider(1, { min: 0, max: 100, step: 1 }),
         cellCount: State.Slider(20, { min: 0, max: 100, step: 1 }),
-        maskStrength: State.Slider(2, { min: 0, max: 10, step: 0.001 }),
+        maskStrength: State.Slider(2, { min: -100, max: 100, step: 0.01 }),
         // maskStrength: State.Slider(0, { min: 0, max: 10, step: 0.001 }),
         speed: State.Slider(0.0007, { min: -2/60, max: 2/60, step: 0.01/60 }),
         noiseScale: State.Slider(0.87, { min: -50, max: 50, step: 0.01 }),
         distance: {
             style: State.Select('exp',
                 { options: ['min', 'pow', 'exp', 'smin'] }),
-            // smooth: State.Slider(27, { min: -80, max: 80, step: 0.01 }),
-            // limit: State.Slider(0.005, { min: 0, max: 2, step: 0.001 }),
-            smooth: State.Slider(80, { min: -80, max: 80, step: 0.01 }),
-            limit: State.Slider(0.013, { min: 0, max: 10, step: 0.001 }),
-            // limit: State.Slider(10, { min: 0, max: 10, step: 0.001 }),
+            // smooth: State.Slider(27, { min: -200, max: 200, step: 0.01 }),
+            // limit: State.Slider(0.005, { min: 0, max: 2, step: 0.0001 }),
+            smooth: State.Slider(32, { min: -200, max: 200, step: 0.01 }),
+            limit: State.Slider(0.0001, { min: 0, max: 10, step: 0.0001 }),
+            // limit: State.Slider(10, { min: 0, max: 10, step: 0.0001 }),
 
             // @todo Get these presets working:
             /*presets: State.Section({
@@ -55,7 +55,6 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
             smooth: State.Slider(0.05, { min: -80, max: 80, step: 0.01 }),
             size: State.Slider(0.001, { min: -10, max: 10, step: 0.001 }),
             fade: State.Slider(0.005, { min: -10, max: 10, step: 0.001 }),
-            vignette: State.Slider(-4, { min: -5, max: 5, step: 0.001 }),
 
             // @todo Get these presets working:
             /* presets: State.Section({
@@ -71,6 +70,10 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                     })
                 },
                 { enumerable: false, label: 'Presets' }) */
+        },
+        vignette: {
+            strength: State.Slider(-22, { min: -50, max: 50, step: 0.01 }),
+            smooth: State.Slider(0.1, { min: -50, max: 50, step: 0.01 })
         },
         space: {
             style: State.Select('exp',
@@ -96,9 +99,13 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 { enumerable: false, label: 'Presets' }) */
         },
         fillCurve: [
-            State.Slider(0, { min: -3, max: 3, step: 0.01 }),
-            State.Slider(0.333, { min: -3, max: 3, step: 0.01 }),
-            State.Slider(0.666, { min: -3, max: 3, step: 0.01 }),
+            // State.Slider(0, { min: -3, max: 3, step: 0.01 }),
+            // State.Slider(0.333, { min: -3, max: 3, step: 0.01 }),
+            // State.Slider(0.666, { min: -3, max: 3, step: 0.01 }),
+            // State.Slider(1, { min: -3, max: 3, step: 0.01 })
+            State.Slider(-3, { min: -3, max: 3, step: 0.01 }),
+            State.Slider(1.05, { min: -3, max: 3, step: 0.01 }),
+            State.Slider(1, { min: -3, max: 3, step: 0.01 }),
             State.Slider(1, { min: -3, max: 3, step: 0.01 })
         ],
         // blur: {
@@ -193,7 +200,8 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         props: {},
         viewShape: [],
         maskShape: [],
-        edgeFade: [],
+        edge: [],
+        vignette: [],
         fillCurve: [],
         rings: [],
         ringSpins: [],
@@ -217,15 +225,22 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         noiseScale: regl.prop('state.noiseScale'),
         distLimit: regl.prop('state.distance.limit'),
         distSmooth: regl.prop('state.distance.smooth'),
+        edgeSizeFade: (c, { state: { edge: { size: s, fade: f } } }) => {
+            const { edge } = cache;
+
+            edge[0] = f;
+            edge[1] = s;
+
+            return edge;
+        },
         edgeSmooth: regl.prop('state.edge.smooth'),
-        edgeSize: regl.prop('state.edge.size'),
-        edgeFade: (c, { state: { edge: { fade: f, vignette: v } } }) => {
-            const { edgeFade } = cache;
+        vignette: (c, { state: { vignette: { strength: st, smooth: sm } } }) => {
+            const { vignette: v } = cache;
 
-            edgeFade[0] = f;
-            edgeFade[1] = v;
+            v[0] = st;
+            v[1] = sm;
 
-            return edgeFade;
+            return v;
         },
         spaceBias: regl.prop('state.space.bias'),
         fillCurve: (c, { state: { fillCurve } }) => {
