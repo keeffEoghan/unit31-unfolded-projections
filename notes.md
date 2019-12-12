@@ -1,5 +1,15 @@
 # Unit31 Unfolded Projections
 
+## To-do
+
+- Texture sprite map.
+- Cycle textures images (fade out, swap, fade in).
+- Rotate texture lookups according to axis from fragment to point.
+- Optical flow interaction:
+  - Set up optical flow pass and buffer.
+  - Separate points creation/movement into its own render pass and buffer, looking up optical flow.
+  - Read points from the main voronoi shader.
+
 ## References
 
 - [`glsl-voronoi-noise`](https://github.com/MaxBittker/glsl-voronoi-noise)

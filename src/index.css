@@ -17,6 +17,10 @@ body {
     z-index: 100;
 }
 
+.hide-controls .controls {
+    display: none;
+}
+
 canvas {
     cursor: none;
 }

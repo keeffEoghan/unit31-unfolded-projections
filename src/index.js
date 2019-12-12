@@ -43,12 +43,19 @@ mask.image.src = basePath+'assets/mask/borders.png';
 const voronoi = getVoronoi(regl, {
     images: assets.textures,
     shapes: assets.shapes,
-    maxImages: regl.limits.maxTextureUnits-1,
+    // maxImages: regl.limits.maxTextureUnits-1,
+    maxImages: 2,
     mask: mask.texture
 });
 
+const toggleControls = (show = document.body.classList.contains('hide-controls')) =>
+    document.body.classList[((show)? 'remove' : 'add')]('hide-controls');
+
+toggleControls(false);
+
 const state = State({
     fullscreen,
+    toggleControls,
     voronoi: voronoi.state,
     presets: State.Section({
             simple: () => merge(state, {})
@@ -134,7 +141,8 @@ regl.frame(({ drawingBufferWidth: w, drawingBufferHeight: h }) => {
 });
 
 const keyMap = {
-    'F': fullscreen
+    'F': fullscreen,
+    'E': toggleControls
 };
 
 document.addEventListener('keyup', ({ keyCode }) => {

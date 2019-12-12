@@ -22,10 +22,15 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
     // @todo Rethink this setup, object's copied into `controls-state`, lost reference.
     const state = out.state = State.Section({
         imageScale: State.Slider(0.4, { min: 0, max: 10, step: 0.01 }),
-        imageCount: State.Slider(15, { min: 1, max: maxImages, step: 1 }),
-        // cellCount: State.Slider(1, { min: 0, max: 100, step: 1 }),
-        cellCount: State.Slider(20, { min: 0, max: 100, step: 1 }),
-        maskStrength: State.Slider(2, { min: -100, max: 100, step: 0.01 }),
+        imageCount: State.Slider(maxImages, { min: 1, max: maxImages, step: 1 }),
+        // cellCount: State.Slider(1, { min: 1, max: 100, step: 1 }),
+        cellCount: State.Slider(25, { min: 1, max: 100, step: 1 }),
+        mask: {
+            red: State.Slider(0.6, { min: -10, max: 10, step: 0.01 }),
+            green: State.Slider(1, { min: -10, max: 10, step: 0.01 }),
+            blue: State.Slider(1, { min: -10, max: 10, step: 0.01 }),
+            alpha: State.Slider(1, { min: -10, max: 10, step: 0.01 })
+        },
         // maskStrength: State.Slider(0, { min: 0, max: 10, step: 0.001 }),
         speed: State.Slider(0.0007, { min: -2/60, max: 2/60, step: 0.01/60 }),
         noiseScale: State.Slider(0.87, { min: -50, max: 50, step: 0.01 }),
@@ -200,6 +205,7 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         props: {},
         viewShape: [],
         maskShape: [],
+        maskLevels: [],
         edge: [],
         vignette: [],
         fillCurve: [],
@@ -220,7 +226,16 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
             return viewShape;
         },
         imageScale: regl.prop('state.imageScale'),
-        maskStrength: regl.prop('state.maskStrength'),
+        maskLevels: (c, { state: { mask: { red: r, green: g, blue: b, alpha: a } } }) => {
+            const { maskLevels: l } = cache;
+
+            l[0] = r;
+            l[1] = g;
+            l[2] = b;
+            l[3] = a;
+
+            return l;
+        },
         speed: regl.prop('state.speed'),
         noiseScale: regl.prop('state.noiseScale'),
         distLimit: regl.prop('state.distance.limit'),
@@ -254,14 +269,14 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
             return f;
         },
         levels: (c, { state: { draw: { red: r, green: g, blue: b, alpha: a } } }) => {
-            const { levels } = cache;
+            const { levels: l } = cache;
 
-            levels[0] = r;
-            levels[1] = g;
-            levels[2] = b;
-            levels[3] = a;
+            l[0] = r;
+            l[1] = g;
+            l[2] = b;
+            l[3] = a;
 
-            return levels;
+            return l;
         },
         mask: regl.prop('mask'),
         maskShape: (c, { mask: { width: w, height: h } }) => {

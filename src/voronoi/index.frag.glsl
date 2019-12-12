@@ -44,7 +44,7 @@ uniform vec4 fillCurve;
 uniform vec4 levels;
 uniform sampler2D mask;
 uniform vec2 maskShape;
-uniform float maskStrength;
+uniform vec4 maskLevels;
 uniform vec2 viewShape;
 uniform float imageScale;
 uniform vec2 vignette;
@@ -441,7 +441,6 @@ float mapEdge(in float edge, in vec3 factors) {
 }
 
 float getVignetteDist(in vec2 pos, in float strength, in float smoothing) {
-    // return pow(1.0+dot(pos, pos), strength);
     float v = infinity;
 
     for(int i = 0; i < ringCount; ++i) {
@@ -482,7 +481,7 @@ void main() {
             edgeSizeFade.x, edgeSizeFade.y, vignetteDist);
     #else
         // Mix between the centroid distance and edge distance according to space.
-        float edge = mapEdge(mix(1.0-dist, voronoi.edge, fill),
+        float edge = mapEdge(mix(min(1.0, 1.0-dist), voronoi.edge, fill),
             edgeSizeFade.x, edgeSizeFade.y, vignetteDist);
     #endif
 
@@ -529,11 +528,12 @@ void main() {
         vec4 color = mix(vec4(0), vec4(colorMixed, image.a), clamp(edge, 0.0, 1.0));
     #endif
 
+    // @todo Handle the masking based on the rings rather than a texture.
     vec2 maskUV = map(uv*aspectMaskView,
         ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
 
     color = clamp(color*levels, 0.0, 1.0)*
-        clamp(pow(texture2D(mask, maskUV), vec4(maskStrength)), 0.0, 1.0);
+        clamp(pow(texture2D(mask, maskUV), vec4(maskLevels)), 0.0, 1.0);
 
     #ifdef premultiplyAlpha
         gl_FragColor = vec4(color.rgb*color.a, color.a);
