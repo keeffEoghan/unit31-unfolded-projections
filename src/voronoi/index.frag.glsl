@@ -34,6 +34,8 @@ precision highp float;
 
 uniform sampler2D images[imageCount];
 uniform vec3 shapes[imageCount];
+uniform float imageSpriteCounts[imageCount];
+uniform vec4 sprites[spriteCount];
 uniform vec4 rings[ringCount];
 uniform float ringSpins[ringCount];
 uniform float tick;
@@ -339,60 +341,95 @@ vec2 mirrorUV(in vec2 uv) {
     return abs(mix(f, vec2(1.0)-f, step(0.0, mod(uv, 2.0)-1.0)));
 }
 
+mat2 getRotation(in vec2 uv, in vec2 pivot) {
+    // vec2 nUV = normalize(uv);
+    // vec2 nPivot = normalize(pivot);
+    // vec2 n = normalize(uv-pivot);
 
-mat2 getAngle(in vec2 uv, in vec2 pivot) {
-    return rotate(atan(uv.y, uv.x)-atan(pivot.y, pivot.x));
-    // return rotate(atan(uv.y-pivot.y, uv.x-pivot.x));
+    // return rotate(atan(nUV.y, nUV.x)-atan(nPivot.y, nPivot.x));
+    // return rotate(atan(uv.y, uv.x)-atan(pivot.y, pivot.x));
+
+    // return rotate(atan(n.y, n.x));
+    // return rotate(atan(nUV.y-nPivot.y, nUV.x-nPivot.x));
+    return rotate(atan(uv.y-pivot.y, uv.x-pivot.x));
+
     // return mat2(1.0, 0.0, 0.0, 1.0);
 }
 
-vec4 getImage(in int index, in vec2 st, in vec2 pivot, in float lod) {
-    // @todo Replace with texture atlas lookup - will cut out these loops anyway
-    vec4 image = vec4(1.0);
+vec4 getImage(in int spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot,
+        in float lod) {
+    vec4 pixel = vec4(1.0);
+    vec4 sprite;
+    float si = float(spriteIndex);
+    float sl = 0.0;
+
+    for(int s = 0; s < spriteCount; ++s) {
+        if(s == spriteIndex) {
+            sprite = sprites[s];
+            break;
+        }
+    }
 
     for(int i = 0; i < imageCount; ++i) {
-        if(i == index) {
+        // Find the image of which the sprite is part.
+        if(si < (sl += imageSpriteCounts[i])) {
             vec3 shape = shapes[i];
-
-            // vec2 relative = getAngle(normalize(st), normalize(voronoi.cell))*
-            //     (st-voronoi.cell);
-
-            // vec2 nst = normalize(st);
-            // vec2 nc = normalize(voronoi.cell);
-            // vec2 nd = normalize(st-voronoi.cell);
-
-            // mat2 rotation = rotate(atan(nd.y, nd.x));
-
-            // mat2 rotation = rotate(atan(nst.y, nst.x)-atan(nc.y, nc.x));
-            // mat2 rotation = rotate(atan(nst-nc));
-
-            // mat2 rotation = rotate(atan(st.y, st.x)-atan(voronoi.cell.y, voronoi.cell.x));
-            // mat2 rotation = rotate(atan(st-voronoi.cell));
-
-            // vec2 relative = getAngle(normalize(st), normalize(voronoi.cell))*
-            //     (st-voronoi.cell);
-            // vec2 relative = rotation*(st-voronoi.cell);
-            // vec2 relative = rotate(pi*-0.5)*(st-pivot);
-
-            // vec2 uv = (mirrorUV(aspectContain(shape.xy/viewShape)*(rotate(pi*0.5)*st)));
-            vec2 uv = mirrorUV(aspectContain(shape.xy/viewShape)*(st-pivot));
             // float nLOD = countImageLODs(shape);
             float nLOD = shape.z;
 
+            // vec2 uvAspect = aspectContain(sprite.zw/viewShape)/
+            //     aspectContain(shape.xy/viewShape);
+            vec2 uvAspect = aspectContain(sprite.zw/viewShape);
+            // vec2 uvAspect = aspectContain(1.0/(shape.xy/viewShape));
+            // vec2 uvAspect = aspectContain(sprite.zw*(shape.xy/viewShape));
+            // vec2 uvAspect = aspectContain(shape.xy/viewShape);
+
+            // vec2 relative = getRotation(normalize(uv), normalize(voronoi.cell))*
+            //     (uv-voronoi.cell);
+
+            // vec2 nuv = normalize(uv);
+            // vec2 nc = normalize(voronoi.cell);
+            // vec2 nd = normalize(uv-voronoi.cell);
+
+            // mat2 rotation = rotate(atan(nd.y, nd.x));
+
+            // mat2 rotation = rotate(atan(nuv.y, nuv.x)-atan(nc.y, nc.x));
+            // mat2 rotation = rotate(atan(nuv-nc));
+
+            // mat2 rotation = rotate(atan(uv.y, uv.x)-atan(voronoi.cell.y, voronoi.cell.x));
+            // mat2 rotation = rotate(atan(uv-voronoi.cell));
+
+            // vec2 relative = getRotation(normalize(uv), normalize(voronoi.cell))*
+            //     (uv-voronoi.cell);
+            // vec2 relative = rotation*(uv-voronoi.cell);
+            // vec2 relative = rotate(pi*-0.5)*(uv-pivot);
+
+
+            vec2 uv = map(mirrorUV(uvAspect*(st-offset)),
+                stRange.xy, stRange.zw, sprite.xy, sprite.xy+sprite.zw)/shape.xy;
+
+            // vec2 rotated = (getRotation(offset, pivot)*((st-offset)-offset))+offset;
+            // vec2 rotated = (getRotation(offset, pivot)*(st-offset))+offset;
+            // vec2 uv = uvAspect/sprite.zw*mirrorUV(rotated);
+            // vec2 uv = mirrorUV(uvAspect*(getRotation(uv, pivot)*(uv-offset)));
+            // vec2 uv = mirrorUV(uvAspect*(uv-offset));
+
             #ifdef GL_EXT_shader_texture_lod
-                image = texture2DLodEXT(images[i], uv, clamp(lod, 0.0, 1.0)*nLOD);
+                pixel = texture2DLodEXT(images[i], uv, clamp(lod, 0.0, 1.0)*nLOD);
             #else
                 // The `bias` argument is in the range [-1, 1] and influences the `mix`
                 // between 2 already-defined levels-of-detail.
-                image = texture2D(images[i], uv, -1.0+(lod*nLOD));
+                pixel = texture2D(images[i], uv, -1.0+(lod*nLOD));
             #endif
+
+            // pixel = vec4(spriteUV, 0.0, 1.0);
 
             // @todo Would need to unroll the loops for image sampler function.
             // vec3 tex(vec2 uv) {
             //     return texture2D(iChannel0, uv).rgb;
             // }
 
-            // image.rgb = blur(st, blurRadius*lod/min(shape.x, shape.y),
+            // pixel.rgb = blur(uv, blurRadius*lod/min(shape.w, shape.h),
             //     aspectCover(shape)/aspectContain(viewShape),
             //     time);
 
@@ -400,19 +437,20 @@ vec4 getImage(in int index, in vec2 st, in vec2 pivot, in float lod) {
         }
     }
 
-    return image;
+    return pixel;
 }
 
-vec4 getImage(in int index, in vec2 st, in vec2 pivot) {
-    return getImage(index, st, pivot, 0.0);
+vec4 getImage(in int spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot) {
+    return getImage(spriteIndex, st, offset, pivot, 0.0);
 }
 
-vec4 getImage(in float index, in vec2 st, in vec2 pivot, in float lod) {
-    return getImage(int(index), st, pivot, lod);
+vec4 getImage(in float spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot,
+        in float lod) {
+    return getImage(int(spriteIndex), st, offset, pivot, lod);
 }
 
-vec4 getImage(in float index, in vec2 st, in vec2 pivot) {
-    return getImage(int(index), st, pivot);
+vec4 getImage(in float spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot) {
+    return getImage(int(spriteIndex), st, offset, pivot);
 }
 
 float mapSpaceToBlur(in float space) {
@@ -424,8 +462,7 @@ float mapSpaceToColor(in float space) {
 }
 
 float mapSpaceToFill(in float space) {
-    return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3],
-        space);
+    return bezier(fillCurve[0], fillCurve[1], fillCurve[2], fillCurve[3], space);
 }
 
 float mapSpaceToUV(in float space) {
@@ -457,12 +494,18 @@ float getVignetteDist(in vec2 pos, in vec2 vignette) {
 }
 
 void main() {
+    // gl_FragColor = texture2D(images[0],
+    //     map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw)*
+    //         aspectContain(shapes[0].xy/viewShape));
+
+    // return;
+
     vec2 aspectMaskView = aspectCover(maskShape/viewShape);
     vec2 xy = uv*aspectMaskView/aspectCover(maskShape);
     float vignetteDist = getVignetteDist(xy, vignette);
     Voronoi voronoi = getVoronoi(xy);
     float dist = voronoi.dist/distLimit;
-    int imageIndex = int(mod(voronoi.index, float(imageCount)));
+    int spriteIndex = int(mod(voronoi.index, float(spriteCount)));
 
     #if spaceStyle == spaceStyle_none
         float colorMix = 0.0;
@@ -491,36 +534,17 @@ void main() {
     #elif spaceStyle == spaceStyle_none || edgeStyle == edgeStyle_none
         vec2 st = map(uv/imageScale, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
 
-        vec2 relative = (getAngle(normalize(st), normalize(voronoi.cell))*st)-
+        vec2 relative = (getRotation(normalize(st), normalize(voronoi.cell))*st)-
             voronoi.cell;
 
-        vec4 image = getImage(imageIndex, relative);
+        vec4 image = getImage(spriteIndex, relative);
         vec4 color = mix(vec4(0), image, (1.0-dist)*edge);
     #else
         vec2 st = map(uv/(imageScale*mapSpaceToUV(clamp(voronoi.space, 0.0, 1.0))),
                 ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
 
-        // vec2 relative = getAngle(normalize(st), normalize(voronoi.cell))*
-        //     (st-voronoi.cell);
-
-        // vec2 nst = normalize(st);
-        // vec2 nc = normalize(voronoi.cell);
-        // vec2 nd = normalize(st-voronoi.cell);
-
-        // mat2 rotation = rotate(atan(nd.y, nd.x));
-
-        // mat2 rotation = rotate(atan(nst.y, nst.x)-atan(nc.y, nc.x));
-        // mat2 rotation = rotate(atan(nst-nc));
-
-        // mat2 rotation = rotate(atan(st.y, st.x)-atan(voronoi.cell.y, voronoi.cell.x));
-        // mat2 rotation = rotate(atan(st-voronoi.cell));
-
-        // vec2 relative = getAngle(normalize(st), normalize(voronoi.cell))*
-        //     (st-voronoi.cell);
-        // vec2 relative = rotation*(st-voronoi.cell);
-        // vec2 relative = rotate(pi*-0.5)*(st-voronoi.cell);
-
-        vec4 image = getImage(imageIndex, st, voronoi.cell,
+        // Pivot around the view center.
+        vec4 image = getImage(spriteIndex, st, voronoi.cell, vec2(0.5),
             mapSpaceToBlur(voronoi.space));
 
         // Brighten and saturate.

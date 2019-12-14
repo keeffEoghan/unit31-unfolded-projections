@@ -7,15 +7,15 @@ import { range, map, each } from 'array-utils';
 import { getBasePath } from 'get-base-path';
 
 import { countImageLODs } from './utils';
+import { getVoronoi, optionalExtensions as voronoiOE } from './voronoi';
+// import spritesData from './assets/sprites/data.json';
+import _spritesData from './assets/sprites/data.json';
 
-import {
-        getVoronoi, optionalExtensions as voronoiOptionalExtensions
-    } from './voronoi';
+const spritesData = _spritesData.slice(0, 2);
 
 const basePath = getBasePath();
-
 const extensions = ['OES_texture_float'];
-const optionalExtensions = [...voronoiOptionalExtensions];
+const optionalExtensions = [...voronoiOE];
 
 const regl = self.regl = getRegl({
     attributes: { antialias: false, depth: false },
@@ -27,25 +27,57 @@ const regl = self.regl = getRegl({
 const canvas = document.querySelector('canvas');
 const fullscreen = () => canvas.requestFullscreen();
 
-document.addEventListener('fullscreenchange', () =>
-    self.dispatchEvent(new Event('resize')));
+document.addEventListener('fullscreenchange', () => dispatchEvent(new Event('resize')));
 
-const assets = { sources: [], images: [], textures: [], shapes: [] };
+const assets = { sources: [], images: [], textures: [], shapes: [], sprites: [] };
 
-const mask = {
-    image: new Image(),
-    texture: regl.texture()
-};
+// @todo Switch images when active cells leave viewport, or simply fade between.
+(function updateAssets() {
+    each((t, i) => t.destroy(), assets.textures);
+
+    assets.sources.length = assets.images.length = assets.textures.length =
+        assets.shapes.length = assets.sprites.length = 0;
+
+    map((spriteData, i) => {
+            const { url, sprites, sheet: { width: w, height: h } } = spriteData;
+            // const source = basePath+url;
+            const source = basePath+url.replace('./src/', '');
+            const image = assets.images[i] = new Image();
+            const texture = assets.textures[i] = regl.texture();
+            const shape = assets.shapes[i] = [1, 1, 1];
+
+            assets.sprites[i] = map(({ x, y, width: w, height: h }) => [x, y, w, h],
+                Object.values(sprites), 0);
+
+            image.addEventListener('load', () => {
+                console.log('Loaded image:', image);
+
+                // @todo Needs power-of-two...
+                texture({ data: image,
+                    // wrap: 'mirror',
+                    // mag: 'linear', min: 'mipmap', mipmap: 'nice' });
+                    mag: 'linear', min: 'linear' });
+
+                shape[2] = countImageLODs((shape[0] = texture.width),
+                    (shape[1] = texture.height));
+            });
+
+            return image.src = source;
+        },
+        spritesData, assets.sources);
+})();
+
+const mask = { image: new Image(), texture: regl.texture() };
 
 mask.image.addEventListener('load', () => mask.texture(mask.image));
 mask.image.src = basePath+'assets/mask/borders.png';
 
 const voronoi = getVoronoi(regl, {
+    mask: mask.texture,
+    maxImages: regl.limits.maxTextureUnits-1,
     images: assets.textures,
     shapes: assets.shapes,
-    // maxImages: regl.limits.maxTextureUnits-1,
-    maxImages: 2,
-    mask: mask.texture
+    sprites: assets.sprites
 });
 
 const toggleControls = (show = document.body.classList.contains('hide-controls')) =>
@@ -55,7 +87,7 @@ toggleControls(false);
 
 const state = State({
     fullscreen,
-    toggleControls,
+    toggleControls: () => toggleControls(),
     voronoi: voronoi.state,
     presets: State.Section({
             simple: () => merge(state, {})
@@ -81,39 +113,6 @@ GUI(state, {
         overflow: auto;
     `
 });
-
-// @todo Switch images when active cells leave viewport, or simply fade between.
-function updateImages() {
-    each((t, i) => t.destroy(), assets.textures);
-
-    assets.sources.length = assets.images.length = assets.textures.length =
-        assets.shapes.length = 0;
-
-    map((v, i) => {
-            const source = basePath+`assets/photos/${i}.jpg`;
-
-            const image = assets.images[i] = new Image();
-            const texture = assets.textures[i] = regl.texture();
-            const shape = assets.shapes[i] = [1, 1, 1];
-
-            image.addEventListener('load', () => {
-                // @todo Power-of-two...
-                texture({ data: image,
-                    // wrap: 'mirror',
-                    // mag: 'linear', min: 'mipmap', mipmap: 'nice' });
-                    mag: 'linear', min: 'linear' });
-
-                shape[2] = countImageLODs((shape[0] = texture.width),
-                    (shape[1] = texture.height));
-            });
-
-            return image.src = source;
-        },
-        range(state.voronoi.imageCount),
-        assets.sources);
-}
-
-updateImages();
 
 voronoi.framebuffer = regl.framebuffer({ colorType: 'float' });
 

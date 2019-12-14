@@ -3,8 +3,11 @@
 ## To-do
 
 - Texture sprite map.
+  - maxTextureSize: 16384
+  - maxTextureUnits: 16
 - Cycle textures images (fade out, swap, fade in).
 - Rotate texture lookups according to axis from fragment to point.
+- Set up mask for the tendrils stuff too.
 - Optical flow interaction:
   - Set up optical flow pass and buffer.
   - Separate points creation/movement into its own render pass and buffer, looking up optical flow.

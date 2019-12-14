@@ -1,6 +1,6 @@
 import State from 'controls-state';
 import merge from 'lodash-es/merge';
-import { range, each, reduce } from 'array-utils';
+import { range, each, map, reduce } from 'array-utils';
 import { positions as screenPositions, count } from '@epok.tech/gl-screen-triangle';
 
 import vert from '@epok.tech/gl-screen-triangle/uv-ndc.vert.glsl';
@@ -9,22 +9,36 @@ import frag from './index.frag.glsl';
 
 export const optionalExtensions = ['EXT_shader_texture_lod'];
 
-export function getVoronoi(regl, { images, shapes, maxImages = images.length, mask }) {
+export function getVoronoi(regl, props) {
+    const {
+            images, shapes, sprites, mask,
+            maxImages = regl.limits.maxTextureUnits
+        } = props;
+
     const out = {
         vert,
         frag,
         maxImages,
         images,
         shapes,
+        sprites,
         mask
     };
 
     // @todo Rethink this setup, object's copied into `controls-state`, lost reference.
     const state = out.state = State.Section({
         imageScale: State.Slider(0.4, { min: 0, max: 10, step: 0.01 }),
-        imageCount: State.Slider(maxImages, { min: 1, max: maxImages, step: 1 }),
-        // cellCount: State.Slider(1, { min: 1, max: 100, step: 1 }),
-        cellCount: State.Slider(25, { min: 1, max: 100, step: 1 }),
+
+        images: reduce((o, v, i) => {
+                o[i] = true;
+
+                return o;
+            },
+            images,
+            { length: images.length }),
+
+        cellCount: State.Slider(2, { min: 1, max: 100, step: 1 }),
+        // cellCount: State.Slider(25, { min: 1, max: 100, step: 1 }),
         mask: {
             red: State.Slider(0.6, { min: -10, max: 10, step: 0.01 }),
             green: State.Slider(1, { min: -10, max: 10, step: 0.01 }),
@@ -123,48 +137,48 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.473, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             1: {
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.416, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             2: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.538, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             3: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.478, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             4: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.556, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             },
             5: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.502, { min: 0, max: 2, step: 0.001 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             }
 
@@ -203,6 +217,8 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
 
     const cache = {
         props: {},
+        imagesOn: [],
+        spritesOn: [],
         viewShape: [],
         maskShape: [],
         maskLevels: [],
@@ -211,7 +227,8 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         fillCurve: [],
         rings: [],
         ringSpins: [],
-        levels: []
+        levels: [],
+        emptySprite: [0, 0, 0, 0]
     };
 
     const uniforms = out.uniforms = {
@@ -289,11 +306,23 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         }
     };
 
-    each((v, i) => {
-            uniforms[`images[${i}]`] = regl.prop(`images[${i}]`);
-            uniforms[`shapes[${i}]`] = regl.prop(`shapes[${i}]`);
+    reduce((s, imageSprites, i) => {
+            // Make enough uniforms for all of these, will only use the enabled ones.
+
+            uniforms[`images[${i}]`] = (c, { images }) => images[cache.imagesOn[i]];
+            uniforms[`shapes[${i}]`] = (c, { shapes }) => shapes[cache.imagesOn[i]];
+
+            uniforms[`imageSpriteCounts[${i}]`] = (c, { sprites }) =>
+                sprites[cache.imagesOn[i]].length;
+
+            return reduce((s) => {
+                    uniforms[`sprites[${s}]`] = () => cache.spritesOn[s];
+
+                    return s+1;
+                },
+                imageSprites, s);
         },
-        range(maxImages));
+        sprites, 0);
 
     each((v, i) => {
             uniforms[`rings[${i}]`] = (c, { state: { rings } }) => {
@@ -320,30 +349,39 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         },
         state.value.rings);
 
-    const updateFrag = ({
-            frag,
-            state: {
-                imageCount: i,
-                cellCount: c,
-                distance: { style: d },
-                edge: { style: b },
-                space: { style: s },
-                draw: { test: t, premultiplyAlpha: a },
-                rings: r,
-                rs = reduce((c, v) => c+v.splits, r, 0)
-            }
-        }) =>
-        `#define imageCount ${i}\n`+
-        `#define cellCount ${c+rs}\n`+
-        `#define ringCount ${r.length}\n`+
-        `#define ringSplitsCount ${rs}\n`+
-        `#define distStyle distStyle_${d}\n`+
-        `#define edgeStyle edgeStyle_${b}\n`+
-        `#define spaceStyle spaceStyle_${s}\n`+
-        ((t)? `#define drawTest\n` : '')+
-        ((a)? `#define premultiplyAlpha\n` : '')+
-        '\n'+
-        frag;
+    function updateFrag(props) {
+        const { imagesOn, spritesOn } = cache;
+
+        const {
+                frag,
+                sprites,
+                maxImages,
+                state: {
+                    imageCount = Math.max(1, Math.min(maxImages, imagesOn.length)),
+                    spriteCount = spritesOn.length,
+                    cellCount: cc,
+                    distance: { style: d },
+                    edge: { style: b },
+                    space: { style: s },
+                    draw: { test: t, premultiplyAlpha: a },
+                    rings: r,
+                    rs = reduce((c, v) => c+v.splits, r, 0)
+                }
+            } = props;
+
+        return `#define imageCount ${imageCount}\n`+
+            `#define spriteCount ${spriteCount}\n`+
+            `#define cellCount ${cc+rs}\n`+
+            `#define ringCount ${r.length}\n`+
+            `#define ringSplitsCount ${rs}\n`+
+            `#define distStyle distStyle_${d}\n`+
+            `#define edgeStyle edgeStyle_${b}\n`+
+            `#define spaceStyle spaceStyle_${s}\n`+
+            ((t)? `#define drawTest\n` : '')+
+            ((a)? `#define premultiplyAlpha\n` : '')+
+            '\n'+
+            frag;
+    }
 
     const draw = regl({
         vert: regl.prop('vert'),
@@ -354,7 +392,25 @@ export function getVoronoi(regl, { images, shapes, maxImages = images.length, ma
         count
     });
 
-    out.draw = (props) => draw(Object.assign(cache.props, out, props));
+    out.draw = (props) => {
+        const p = Object.assign(cache.props, out, props);
+        const { sprites, state: { images } } = p;
+        const { imagesOn, spritesOn } = cache;
+
+        imagesOn.length = spritesOn.length = 0;
+
+        reduce((imagesOn, b, i) => {
+                if(b) {
+                    imagesOn.push(i);
+                    spritesOn.push(...sprites[i]);
+                }
+
+                return imagesOn;
+            },
+            images, imagesOn);
+
+        return draw(p);
+    };
 
     return out;
 }
