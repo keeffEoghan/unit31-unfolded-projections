@@ -27,7 +27,7 @@ export function getVoronoi(regl, props) {
 
     // @todo Rethink this setup, object's copied into `controls-state`, lost reference.
     const state = out.state = State.Section({
-        imageScale: State.Slider(0.4, { min: 0, max: 10, step: 0.01 }),
+        imageScale: State.Slider(0.25, { min: 0, max: 10, step: 0.01 }),
 
         images: reduce((o, v, i) => {
                 o[i] = true;
@@ -37,17 +37,18 @@ export function getVoronoi(regl, props) {
             images,
             { length: images.length }),
 
-        cellCount: State.Slider(2, { min: 1, max: 100, step: 1 }),
-        // cellCount: State.Slider(25, { min: 1, max: 100, step: 1 }),
+        // cellCount: State.Slider(2, { min: 1, max: 300, step: 1 }),
+        // cellCount: State.Slider(25, { min: 1, max: 300, step: 1 }),
+        cellCount: State.Slider(50, { min: 1, max: 300, step: 1 }),
         mask: {
             red: State.Slider(0.6, { min: -10, max: 10, step: 0.01 }),
             green: State.Slider(1, { min: -10, max: 10, step: 0.01 }),
             blue: State.Slider(1, { min: -10, max: 10, step: 0.01 }),
             alpha: State.Slider(1, { min: -10, max: 10, step: 0.01 })
         },
-        // maskStrength: State.Slider(0, { min: 0, max: 10, step: 0.001 }),
         speed: State.Slider(0.0007, { min: -2/60, max: 2/60, step: 0.01/60 }),
-        noiseScale: State.Slider(0.87, { min: -50, max: 50, step: 0.01 }),
+        // noiseScale: State.Slider(0.9, { min: -50, max: 50, step: 0.01 }),
+        noiseScale: State.Slider(1.1, { min: -50, max: 50, step: 0.01 }),
         distance: {
             style: State.Select('exp',
                 { options: ['min', 'pow', 'exp', 'smin'] }),
@@ -127,58 +128,54 @@ export function getVoronoi(regl, props) {
             State.Slider(1, { min: -3, max: 3, step: 0.01 }),
             State.Slider(1, { min: -3, max: 3, step: 0.01 })
         ],
-        // blur: {
-        //     radius: ,
-        //     samples:
-        // },
         rings: {
             length: 6,
             0: {
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.473, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(12, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             1: {
                 x: State.Slider(0.437, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(0.244, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.416, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(9, { min: 0, max: 100, step: 1 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(12, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(6, { min: 0, max: 100, step: 1 })
             },
             2: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.538, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(10, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             3: {
                 x: State.Slider(-0.424, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.037, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.478, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(8, { min: 0, max: 100, step: 1 }),
-                splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                splits: State.Slider(10, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(8, { min: 0, max: 100, step: 1 })
             },
             4: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.556, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             },
             5: {
                 x: State.Slider(0.097, { min: -2, max: 2, step: 0.001 }),
                 y: State.Slider(-0.195, { min: -2, max: 2, step: 0.001 }),
                 radius: State.Slider(0.502, { min: 0, max: 2, step: 0.001 }),
-                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
+                // splits: State.Slider(0, { min: 0, max: 100, step: 1 }),
                 spin: State.Slider(-3, { min: 0, max: 100, step: 1 })
             }
 
@@ -354,7 +351,6 @@ export function getVoronoi(regl, props) {
 
         const {
                 frag,
-                sprites,
                 maxImages,
                 state: {
                     imageCount = Math.max(1, Math.min(maxImages, imagesOn.length)),
