@@ -35,10 +35,14 @@ const assets = { sources: [], images: [], textures: [], shapes: [], sprites: [] 
     assets.sources.length = assets.images.length = assets.textures.length =
         assets.shapes.length = assets.sprites.length = 0;
 
+    // Handle LFS paths on Github Pages - see https://github.com/git-lfs/git-lfs/issues/1342
+    const imageBase = ((location.href.match(/https:\/\/epok\.tech\/unit31-unfolded-projections\//gi))?
+            'https://media.githubusercontent.com/media/keeffEoghan/unit31-unfolded-projections/master/docs/'
+        :   basePath);
+
     map((spriteData, i) => {
-            const { url, sprites, sheet: { width: w, height: h } } = spriteData;
-            // const source = basePath+url;
-            const source = basePath+url.replace('./src/', '');
+            const { url, sprites } = spriteData;
+            const source = url.replace('./src/', imageBase);
             const image = assets.images[i] = new Image();
             const texture = assets.textures[i] = regl.texture();
             const shape = assets.shapes[i] = [1, 1, 1];
@@ -58,6 +62,8 @@ const assets = { sources: [], images: [], textures: [], shapes: [], sprites: [] 
                 shape[2] = countImageLODs((shape[0] = texture.width),
                     (shape[1] = texture.height));
             });
+
+            image.crossOrigin = '';
 
             return image.src = source;
         },
