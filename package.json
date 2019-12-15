@@ -14,7 +14,7 @@
     "dev": "parcel --log-level verbose ./src/index.html ./src/assets/**/*",
     "build": "rm -rf dist/ && parcel build ./src/index.html ./src/assets/**/* -d ./dist/ --public-url ./dist/",
     "docs": "rm -rf docs/ && parcel build ./src/index.html ./src/assets/**/* -d ./docs/ --public-url ./",
-    "sprites": "rm -rf src/assets/sprites.gitignore/ && mkdir src/assets/sprites.gitignore/ && node ./run/sprites.js"
+    "sprites": "rm -rf src/assets/sprites/ && mkdir src/assets/sprites/ && node ./run/sprites.js"
   },
   "dependencies": {
     "@epok.tech/gl-screen-triangle": "https://github.com/keeffEoghan/gl-screen-triangle",

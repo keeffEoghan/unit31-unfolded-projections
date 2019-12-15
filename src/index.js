@@ -8,8 +8,8 @@ import { getBasePath } from 'get-base-path';
 
 import { countImageLODs } from './utils';
 import { getVoronoi, optionalExtensions as voronoiOE } from './voronoi';
-// import spritesData from './assets/sprites.gitignore/data.json';
-import _spritesData from './assets/sprites.gitignore/data.json';
+// import spritesData from './assets/sprites/data.json';
+import _spritesData from './assets/sprites/data.json';
 
 const spritesData = _spritesData.slice(0, 2);
 

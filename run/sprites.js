@@ -38,7 +38,7 @@ const getBatch = (start, end, images, batches, data) => () => {
 
     (debug && console.log('Spritesheet:', out));
 
-    const url = `./src/assets/sprites.gitignore/${data.length}.png`;
+    const url = `./src/assets/sprites/${data.length}.lfs.png`;
     const imageWriter = createWriteStream(url);
 
     imageWriter.on('finish', () => {
@@ -51,7 +51,7 @@ const getBatch = (start, end, images, batches, data) => () => {
             const dataString = JSON.stringify(data);
 
             (debug && console.log(dataString));
-            writeFileSync(`./src/assets/sprites.gitignore/data.json`, dataString);
+            writeFileSync(`./src/assets/sprites/data.lfs.json`, dataString);
         }
     });
 
