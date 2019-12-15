@@ -8,10 +8,7 @@ import { getBasePath } from 'get-base-path';
 
 import { countImageLODs } from './utils';
 import { getVoronoi, optionalExtensions as voronoiOE } from './voronoi';
-// import spritesData from './assets/sprites/data.json';
-import _spritesData from './assets/sprites/data.json';
-
-const spritesData = _spritesData.slice(0, 2);
+import spritesData from './assets/sprites/data.lfs.json';
 
 const basePath = getBasePath();
 const extensions = ['OES_texture_float'];

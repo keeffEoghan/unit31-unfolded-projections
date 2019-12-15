@@ -1,5 +1,4 @@
 const { writeFileSync, createWriteStream } = require('fs');
-const { resolve } = require('path');
 const glob = require('glob');
 const binPack = require('bin-pack');
 const Spritesmith = require('spritesmith');
