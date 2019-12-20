@@ -68,6 +68,7 @@ const assets = { sources: [], images: [], textures: [], shapes: [], sprites: [] 
             return image.src = source;
         },
         spritesData, assets.sources);
+        // spritesData.slice(0, 2), assets.sources);
 })();
 
 const mask = { image: new Image(), texture: regl.texture() };
@@ -92,10 +93,6 @@ const state = State({
     fullscreen,
     toggleControls: () => toggleControls(),
     voronoi: voronoi.state,
-    presets: State.Section({
-            simple: () => merge(state, {})
-        },
-        { enumerable: false, label: 'Presets' }),
 
     stateOutput: State.Section({
             output: State.Raw((h, { state }) =>

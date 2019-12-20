@@ -109,8 +109,8 @@ uniform vec2 vignette;
 
 varying vec2 uv;
 
-const vec4 ndcRange = vec4(-1, -1, 1, 1);
-const vec4 stRange = vec4(0, 0, 1, 1);
+const vec4 rangeNDC = vec4(-1, -1, 1, 1);
+const vec4 rangeST = vec4(0, 0, 1, 1);
 
 // #pragma glslify: blur = require('glsl-hash-blur', sample=tex, iterations=20);
 #pragma glslify: rotate = require('glsl-rotate/rotation-2d');
@@ -342,18 +342,7 @@ vec2 mirrorUV(in vec2 uv) {
 }
 
 mat2 getRotation(in vec2 uv, in vec2 pivot) {
-    // vec2 nUV = normalize(uv);
-    // vec2 nPivot = normalize(pivot);
-    // vec2 n = normalize(uv-pivot);
-
-    // return rotate(atan(nUV.y, nUV.x)-atan(nPivot.y, nPivot.x));
-    // return rotate(atan(uv.y, uv.x)-atan(pivot.y, pivot.x));
-
-    // return rotate(atan(n.y, n.x));
-    // return rotate(atan(nUV.y-nPivot.y, nUV.x-nPivot.x));
-    return rotate(atan(uv.y-pivot.y, uv.x-pivot.x));
-
-    // return mat2(1.0, 0.0, 0.0, 1.0);
+    return rotate(atan(uv.y-pivot.y, uv.x-pivot.x)+(pi*0.5));
 }
 
 vec4 getImage(in int spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot,
@@ -374,45 +363,14 @@ vec4 getImage(in int spriteIndex, in vec2 st, in vec2 offset, in vec2 pivot,
         // Find the image of which the sprite is part.
         if(si < (sl += imageSpriteCounts[i])) {
             vec3 shape = shapes[i];
-            // float nLOD = countImageLODs(shape);
             float nLOD = shape.z;
-
-            // vec2 uvAspect = aspectContain(sprite.zw/viewShape)/
-            //     aspectContain(shape.xy/viewShape);
             vec2 uvAspect = aspectContain(sprite.zw/viewShape);
-            // vec2 uvAspect = aspectContain(1.0/(shape.xy/viewShape));
-            // vec2 uvAspect = aspectContain(sprite.zw*(shape.xy/viewShape));
-            // vec2 uvAspect = aspectContain(shape.xy/viewShape);
+            mat2 rotation = getRotation(offset, pivot);
+            vec2 pos = offset-st;
+            vec2 rotated = (rotation*(pos-pivot))+pivot;
 
-            // vec2 relative = getRotation(normalize(uv), normalize(voronoi.cell))*
-            //     (uv-voronoi.cell);
-
-            // vec2 nuv = normalize(uv);
-            // vec2 nc = normalize(voronoi.cell);
-            // vec2 nd = normalize(uv-voronoi.cell);
-
-            // mat2 rotation = rotate(atan(nd.y, nd.x));
-
-            // mat2 rotation = rotate(atan(nuv.y, nuv.x)-atan(nc.y, nc.x));
-            // mat2 rotation = rotate(atan(nuv-nc));
-
-            // mat2 rotation = rotate(atan(uv.y, uv.x)-atan(voronoi.cell.y, voronoi.cell.x));
-            // mat2 rotation = rotate(atan(uv-voronoi.cell));
-
-            // vec2 relative = getRotation(normalize(uv), normalize(voronoi.cell))*
-            //     (uv-voronoi.cell);
-            // vec2 relative = rotation*(uv-voronoi.cell);
-            // vec2 relative = rotate(pi*-0.5)*(uv-pivot);
-
-
-            vec2 uv = map(mirrorUV(uvAspect*(st-offset)),
-                stRange.xy, stRange.zw, sprite.xy, sprite.xy+sprite.zw)/shape.xy;
-
-            // vec2 rotated = (getRotation(offset, pivot)*((st-offset)-offset))+offset;
-            // vec2 rotated = (getRotation(offset, pivot)*(st-offset))+offset;
-            // vec2 uv = uvAspect/sprite.zw*mirrorUV(rotated);
-            // vec2 uv = mirrorUV(uvAspect*(getRotation(uv, pivot)*(uv-offset)));
-            // vec2 uv = mirrorUV(uvAspect*(uv-offset));
+            vec2 uv = map(mirrorUV(uvAspect*rotated),
+                rangeST.xy, rangeST.zw, sprite.xy, sprite.xy+sprite.zw)/shape.xy;
 
             #ifdef GL_EXT_shader_texture_lod
                 pixel = texture2DLodEXT(images[i], uv, clamp(lod, 0.0, 1.0)*nLOD);
@@ -494,12 +452,6 @@ float getVignetteDist(in vec2 pos, in vec2 vignette) {
 }
 
 void main() {
-    // gl_FragColor = texture2D(images[0],
-    //     map(uv, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw)*
-    //         aspectContain(shapes[0].xy/viewShape));
-
-    // return;
-
     vec2 aspectMaskView = aspectCover(maskShape/viewShape);
     vec2 xy = uv*aspectMaskView/aspectCover(maskShape);
     float vignetteDist = getVignetteDist(xy, vignette);
@@ -532,7 +484,7 @@ void main() {
         // vec4 color = vec4(voronoi.fill, voronoi.dist, voronoi.edge, 1.0);
         vec4 color = vec4(fill, dist, edge, 1.0);
     #elif spaceStyle == spaceStyle_none || edgeStyle == edgeStyle_none
-        vec2 st = map(uv/imageScale, ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+        vec2 st = map(uv/imageScale, rangeNDC.xy, rangeNDC.zw, rangeST.xy, rangeST.zw);
 
         vec2 relative = (getRotation(normalize(st), normalize(voronoi.cell))*st)-
             voronoi.cell;
@@ -541,10 +493,10 @@ void main() {
         vec4 color = mix(vec4(0), image, (1.0-dist)*edge);
     #else
         vec2 st = map(uv/(imageScale*mapSpaceToUV(clamp(voronoi.space, 0.0, 1.0))),
-                ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+                rangeNDC.xy, rangeNDC.zw, rangeST.xy, rangeST.zw);
 
         // Pivot around the view center.
-        vec4 image = getImage(spriteIndex, st, voronoi.cell, vec2(0.5),
+        vec4 image = getImage(spriteIndex, st, voronoi.cell, vec2(0.0),
             mapSpaceToBlur(voronoi.space));
 
         // Brighten and saturate.
@@ -554,7 +506,7 @@ void main() {
 
     // @todo Handle the masking based on the rings rather than a texture.
     vec2 maskUV = map(uv*aspectMaskView,
-        ndcRange.xy, ndcRange.zw, stRange.xy, stRange.zw);
+        rangeNDC.xy, rangeNDC.zw, rangeST.xy, rangeST.zw);
 
     color = clamp(color*levels, 0.0, 1.0)*
         clamp(pow(texture2D(mask, maskUV), vec4(maskLevels)), 0.0, 1.0);
